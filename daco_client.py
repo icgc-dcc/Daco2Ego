@@ -2,7 +2,7 @@ from ego_client import EgoClient
 
 class DacoClient(object):
     daco_names = { 'portal' }
-    cloud_policy_names = ['aws', 'collab']
+    cloud_policy_names = {'aws', 'collab'}
     all_names = daco_names | cloud_policy_names
 
     def __init__(self, config, client=None):

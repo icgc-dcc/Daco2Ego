@@ -4,6 +4,7 @@ import sys
 import gzip
 import csv
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 from daco_client import DacoClient
 
 def read_config(name="config/default.conf"):
@@ -17,16 +18,16 @@ def read_gzip(name):
     return data
 
 def read_file(name):
-    with open(name,'r') as f:
+    with open(name,'rb') as f:
         data=f.read()
     return data
 
 def decrypt(data, key, iv):
-    print(f"Creating data extractor with key={key}({len(key)}), init vector="
-          f"{iv}({len(iv)})")
+    #print(f"Creating data extractor with key={key}({len(key)}), init vector="
+    #      f"{iv}({len(iv)})")
     aes = AES.new(key, AES.MODE_CBC, iv)
-    print(f"Decrypting data of type: {type(data)}")
-    return aes.decrypt(data)
+    # print(f"Decrypting data of type: {type(data)}")
+    return unpad(aes.decrypt(data), 16)
 
 def users(data):
     # decode url entities
@@ -36,18 +37,13 @@ def users(data):
 # create a byte string of length size bytes with value
 # from the given hex string.
 def hexpad(hex_string,size):
-    return bytes.fromhex(hex_string.zfill(2*size))
+    padding = size - int(len(hex_string)/2)
+    return bytes.fromhex(hex_string + ("00" * padding))
 
-# def decrypt_file(aes_file, config):
-#   return decrypt(bytes(read_file(aes_file)),
-#                  hexpad(config['key'], 16),
-#                  hexpad(config['iv'], 16))# 16 bytes
-
-def decrypt_file(aes_file, config):
-    with open(aes_file, "rb") as f:
-        data=f.read()
-    return data
-
+def decrypt_file(aes_file, key, iv):
+  return decrypt(bytes(read_gzip(aes_file)),
+                 hexpad(key, 16),
+                 hexpad(iv, 16))# 16 bytes
 
 def update_ego(ego, daco, cloud):
     """ Handle scenarios 1-4 wiki specification at
@@ -115,14 +111,16 @@ def init(args):
     client = DacoClient(config['client'])
 
     print("Getting daco users")
+    key = config['aes']['key']
+    iv  = config['aes']['iv']
+    print(decrypt_file(config['daco_file'], config['aes']))
     #daco_users = users(decrypt_file(config['daco_file'], config['aes']))
-    daco_users = users(read_file(config['daco_file']))
+    #daco_users = users(read_file(config['daco_file']))
     print("Getting cloud users")
     # cloud_users = users(decrypt_file(config['cloud_file'], config['aes']))
-    cloud_users = users(read_file(config['cloud_file']))
+    #cloud_users = users(read_file(config['cloud_file']))
 
-    return client, daco_users, cloud_users
-
+    #return client, daco_users, cloud_users
 
 def main(_program_name, *args):
     issues = []
@@ -131,17 +129,14 @@ def main(_program_name, *args):
         (client, daco_users, cloud_users) = init(args)
     except Exception as e:
         # Scenario 5
-        issues.append(str(e))
-    else:
-        # Scenarios 1,2,3,4,6
-        issues.append(update_ego(client, daco_users, cloud_users))
-
-    send_report(issues)
-
-
-
-
-
+        print(str(e))
+    #     issues.append(str(e))
+    # else:
+    #     pass
+    #     # Scenarios 1,2,3,4,6
+    #     # issues.append(update_ego(client, daco_users, cloud_users))
+    #
+    # send_report(issues)
 
 if __name__ == "__main__":
    main(*sys.argv)
