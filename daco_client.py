@@ -1,35 +1,32 @@
-from ego_client import EgoClient
-
 class DacoClient(object):
-    def __init__(self, config, daco, cloud, client=None):
+    def __init__(self, daco_map, cloud_map, ego_client):
         """
+        :param daco_map:
+            A dictionary of user_ids mapped to the dictionary of CSV keys
+            (user name,openid,email,csa) read from our DACO file, indicating
+            all the users who should have DACO access.
 
-        :param config:
-        :param daco: A dictionary of user_ids mapped to the dictionary of CSV keys
-                    read from our file. Each users in the dictionary should have
-                    daco access. (user name,openid,email,csa)
+        :param cloud_map:
+            A dictionary that of the same sort as above, but for users
+            who should have cloud access.
 
-        :param cloud:  A dictionary that of the same sort as above, for users
-                    who should have cloud access.
-        :param client:
+        :param ego_client:
+            An EgoClient object that applies the requested changes
+            to the Ego server.
         """
-        if client is None:
-            self.ego_client = EgoClient()
-        else:
-            self.ego_client = client
-
         self.issues_log = []
-        self.ids = None
 
-        self.daco_map = daco
-        self.daco_users = daco.keys()
-        self.cloud_users = cloud.keys()
+        self.ego_client=ego_client
+        self.daco_map = daco_map
+
+        self.daco_users = daco_map.keys()
+        self.cloud_users = cloud_map.keys()
 
     def update_ego(self):
         """ Handle scenarios 1-4 wiki specification at
             https://wiki.oicr.on.ca/display/DCCSOFT/DACO2EGO
 
-            Scenario 6 (error handling) is also handled implictly by all
+            Scenario 6 (error handling) is also handled implicitly by all
             calls to our ego client, which traps and logs all exceptions.
 
             returns: A list of issues encountered
@@ -44,11 +41,11 @@ class DacoClient(object):
 
         # scenarios 1 & 2
         for user in daco_users:
-            self.handle_access_allowed(user, cloud_users, ego_users)
+            self.handle_access_allowed(user)
 
         # scenario 3
         for user in ego_users:
-            self.handle_access_denied(user, daco_users, cloud_users)
+            self.handle_access_denied(user)
         return self.report_issues()
 
     def invalid_users(self):
@@ -60,28 +57,30 @@ class DacoClient(object):
     def valid_cloud_users(self):
         return self.cloud_users - self.invalid_users()
 
-    # scenarios 1 & 2
-    def handle_access_allowed(self, user, cloud_users, ego_users):
-        grant_cloud = user in cloud_users
-        if user not in ego_users:
-            # Scenario 1
-           self.create_user(user,self.daco_map[user])
-        # scenario 2
-        self.ensure_access(user, grant_cloud)
-
-    # scenarios 1
-    def create_user(self, user, details):
-        self.log(f"Creating account for user {user} with details {details}")
+    def get_user_name(self, user):
+        name = None
         try:
-            self.ego_client.create_user(user, details['name'])
-        except Exception as e:
-            self.err("Can't create user {user}", e)
+            name = self.daco_map[user]
+        except KeyError as e:
+            self.err(f"Can't get name for user {user}", e)
+        return name
+
+    def grant_cloud(self, user):
+        return user in self.valid_cloud_users()
+
+    # scenarios 1 & 2
+    def handle_access_allowed(self, user):
+        if user not in self.get_ego_users():
+            # Scenario 1
+           self.create_user(user,self.get_user_name(user))
+        # scenario 2
+        self.ensure_access(user, self.grant_cloud(user))
 
     # scenario 3
-    def handle_access_denied(self, user, daco_users, cloud_users):
-        if user not in daco_users:
+    def handle_access_denied(self, user):
+        if user not in self.valid_daco_users():
             self.revoke_access(user, "user not in daco list")
-        elif user not in cloud_users:
+        elif user not in self.valid_cloud_users():
             self.revoke_cloud(user)
 
     # Handle scenario 4 (User has cloud access, but not daco access)
@@ -102,19 +101,39 @@ class DacoClient(object):
         self.issues_log.append(msg)
 
     def err(self, msg, e):
-        self.issues_log.append("Error:" + msg + ":" + str(e))
+        self.issues_log.append(f"Error: {msg} -- {repr(e)}")
+
+    # scenario 1
+    def create_user(self, user, name):
+        try:
+            self.ego_client.create_user(user, name)
+            self.log(f"Created account for user {user} with name {name}")
+        except Exception as e:
+            self.err(f"Can't create user '{user}'", e)
 
     def revoke_access(self, user, reason):
-        self.log(f"Revoking all daco access for user {user}: ({reason})")
-        self.ego_client.revoke_access(user)
+        try:
+            self.ego_client.revoke_access(user)
+            self.log(f"Revoked all daco access for user '{user}':({reason})")
+        except Exception as e:
+            self.err(f"Can't revoke daco access for user '{user}'", e)
 
     def revoke_cloud(self, user):
-        self.log(f"Revoking cloud access for user {user}")
-        self.ego_client.revoke_cloud(user)
+        try:
+            self.ego_client.revoke_cloud(user)
+            self.log(f"Revoked cloud access for user '{user}'")
+        except Exception as e:
+            self.err(f"Can't revoke cloud access for user '{user}'", e)
 
     def ensure_access(self, user, grant_cloud):
-        self.log(f"Ensuring {user} has daco access(cloud={grant_cloud}")
-        self.ego_client.ensure_access(user, grant_cloud)
+        try:
+            self.ego_client.ensure_access(user, grant_cloud)
+            self.log(f"Ensured user '{user}'"
+                     f" has daco access "
+                     f"(cloud={grant_cloud})")
+        except Exception as e:
+            self.err(f"Can't ensure access for user '{user}'"
+                    f"(cloud={grant_cloud})", e)
 
     def report_issues(self):
         return self.issues_log

@@ -14,7 +14,7 @@ def read_config(name="config/default.conf"):
 def users(data):
     text = data.decode()
     csvreader = csv.DictReader(text.splitlines())
-    return { u['openid']: u for u in csvreader}
+    return { u['openid']: u['user name'] for u in csvreader}
 
 def send_report(issues):
     print(f"Daco2Ego report\nWe found these issues: {issues}")
