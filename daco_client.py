@@ -35,7 +35,6 @@ class DacoClient(object):
         for user in self.invalid_users():
             self.handle_invalid_user(user)
 
-        cloud_users = self.valid_cloud_users()
         daco_users = self.valid_daco_users()
         ego_users = self.get_ego_users()
 
@@ -52,10 +51,10 @@ class DacoClient(object):
         return self.cloud_users - self.daco_users
 
     def valid_daco_users(self):
-        return self.daco_users - self.invalid_users()
+        return self.daco_users
 
     def valid_cloud_users(self):
-        return self.cloud_users - self.invalid_users()
+        return self.cloud_users & self.daco_users
 
     def get_user_name(self, user):
         name = None
