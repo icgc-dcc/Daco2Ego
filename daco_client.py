@@ -1,8 +1,16 @@
+def format_tuple(name, args):
+    if len(args) == 1:
+        return f"{name}({args[0]})"
+    return f"{name}{args}"
+
+def format_exception(e):
+    return format_tuple(e.__class__.__name__, e.args)
+
 class DacoClient(object):
     def __init__(self, daco_map, cloud_map, ego_client):
         """
         :param daco_map:
-            A dictionary of user_ids mapped to the dictionary of CSV keys
+            An ordered dictionary of user_ids mapped to the CSV dictionary
             (user name,openid,email,csa) read from our DACO file, indicating
             all the users who should have DACO access.
 
@@ -19,8 +27,8 @@ class DacoClient(object):
         self.ego_client=ego_client
         self.daco_map = daco_map
 
-        self.daco_users = daco_map.keys()
-        self.cloud_users = cloud_map.keys()
+        self.daco_users = list(daco_map.keys())
+        self.cloud_users = list(cloud_map.keys())
 
     def update_ego(self):
         """ Handle scenarios 1-4 wiki specification at
@@ -48,13 +56,15 @@ class DacoClient(object):
         return self.report_issues()
 
     def invalid_users(self):
-        return self.cloud_users - self.daco_users
+        return [c for c in self.cloud_users if c not in self.daco_users]
+        #return self.cloud_users - self.daco_users
 
     def valid_daco_users(self):
         return self.daco_users
 
     def valid_cloud_users(self):
-        return self.cloud_users & self.daco_users
+        return [c for c in self.cloud_users if c in self.daco_users]
+        #return self.cloud_users & self.daco_users
 
     def get_user_name(self, user):
         name = None
@@ -64,7 +74,7 @@ class DacoClient(object):
             self.err(f"Can't get name for user {user}", e)
         return name
 
-    def grant_cloud(self, user):
+    def has_cloud(self, user):
         return user in self.valid_cloud_users()
 
     # scenarios 1 & 2
@@ -73,7 +83,7 @@ class DacoClient(object):
             # Scenario 1
            self.create_user(user,self.get_user_name(user))
         # scenario 2
-        self.ensure_access(user, self.grant_cloud(user))
+        self.ensure_access(user, self.has_cloud(user))
 
     # scenario 3
     def handle_access_denied(self, user):
@@ -89,11 +99,11 @@ class DacoClient(object):
     def get_ego_users(self):
         """ Get all users from ego with daco related policies
         """
-        users = []
+        users = {}
         try:
             users = self.ego_client.get_daco_users()
         except Exception as e:
-            self.err("Can't get list of daco users from ego:", e)
+            self.err("Can't get list of daco users from ego", e)
         return users
 
     def log(self, msg):
@@ -124,15 +134,49 @@ class DacoClient(object):
         except Exception as e:
             self.err(f"Can't revoke cloud access for user '{user}'", e)
 
-    def ensure_access(self, user, grant_cloud):
+    def get_daco_access(self, user):
+        ego_has_daco, ego_has_cloud = self.ego_client.get_daco_access(user)
+        return ego_has_daco, ego_has_cloud
+
+    def grant_cloud(self, user):
         try:
-            self.ego_client.ensure_access(user, grant_cloud)
-            self.log(f"Ensured user '{user}'"
-                     f" has daco access "
-                     f"(cloud={grant_cloud})")
+            self.ego_client.grant_cloud(user)
+            self.log(f"Granted cloud access to user '{user}'")
         except Exception as e:
-            self.err(f"Can't ensure access for user '{user}'"
-                    f"(cloud={grant_cloud})", e)
+            self.err(f"Can't grant cloud access to user '{user}'",e)
+
+    def grant_access(self, user):
+        try:
+            self.ego_client.grant_access(user)
+            self.log(f"Granted daco access to user '{user}'")
+        except Exception as e:
+            self.err(f"Can't grant daco access to user '{user}'", e)
+
+    def ensure_access(self, user, has_cloud):
+        try:
+            ego_has_daco, ego_has_cloud = self.get_daco_access(user)
+        except Exception as e:
+            self.err(f"Can't get ego settings for user '{user}'",e)
+            return
+
+        if not ego_has_daco:
+            self.grant_access(user)
+        else:
+            self.log(f"User '{user}' already has daco access")
+
+        # should have cloud access, not set up in ego
+        if has_cloud:
+            if not ego_has_cloud:
+                self.grant_cloud(user)
+            else:
+                self.log(f"User '{user}' already has cloud access")
 
     def report_issues(self):
         return self.issues_log
+
+    def log(self, msg):
+        self.issues_log.append(msg)
+
+    def err(self, msg, e):
+        self.issues_log.append(f"Error: {msg} -- {format_exception(e)}")
+
