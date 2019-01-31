@@ -42,17 +42,17 @@ def test_err():
 
 def test_invalid():
     d=DacoClient(daco, cloud, None)
-    invalid = d.invalid_users()
+    invalid = d.invalid_users
     assert invalid == ['c','g']
 
 def test_valid_daco():
     d = DacoClient(daco, cloud, None)
-    valid = d.valid_daco_users()
+    valid = d.all_users
     assert valid == ['a','b','d', 'e', 'f']
 
 def test_valid_cloud():
     d = DacoClient(daco, cloud, None)
-    valid = d.valid_cloud_users()
+    valid = d.cloud_users
     assert valid == ['b','f']
 
 def test_user_name_success():
@@ -302,7 +302,7 @@ def test_allowed1():
     user='a'
     d.handle_access_allowed(user)
 
-    assert e.get_calls() == { 'get_daco_users': ['Called'],
+    assert e.get_calls() == { 'user_exists': [user],
                               'get_daco_access': [user]
                             }
     expected = f"User '{user}' already has daco access"
@@ -315,7 +315,7 @@ def test_allowed2():
     user='b'
     # user b is already in Ego. He should have access to DACO and to Cloud
     d.handle_access_allowed(user)
-    assert e.get_calls() == {'get_daco_users': ['Called'],
+    assert e.get_calls() == {'user_exists': [user],
                              'get_daco_access': [user]
                              }
 
@@ -331,7 +331,7 @@ def test_allowed3():
     # user f is not in Ego. He should have access to DACO, and cloud.
     user='f'
     d.handle_access_allowed(user)
-    assert e.get_calls() == {'get_daco_users': ['Called'],
+    assert e.get_calls() == {'user_exists': [user],
                              'get_daco_access': [user],
                              'create_user': [(user, daco[user])],
                              'grant_access': [user],
@@ -392,21 +392,6 @@ def test_update_ego():
 
     d.update_ego()
 
-    # expected = {
-    #     "Revoked all daco access for user 'c':(user in csa file but not in DACO file)",
-    #     "Revoked all daco access for user 'g':(user in csa file but not in DACO file)",
-    #     "Created account for user f with name Person F",
-    #     "Ensured user 'f' has daco access (cloud=True)",
-    #     "Ensured user 'b' has daco access (cloud=True)",
-    #     "Ensured user 'a' has daco access (cloud=False)",
-    #     "Created account for user d with name Person D",
-    #     "Ensured user 'd' has daco access (cloud=False)",
-    #     "Ensured user 'e' has daco access (cloud=False)",
-    #     "Revoked cloud access for user 'a'",
-    #     "Revoked all daco access for user 'h':(user not in daco list)",
-    #     "Revoked cloud access for user 'e'"
-    # }
-
     expected =[
         "Revoked all daco access for user 'c':(user in csa file but not in DACO file)",
         "Revoked all daco access for user 'g':(user in csa file but not in DACO file)",
@@ -430,7 +415,8 @@ def test_update_ego():
     assert e.get_calls() == {
         'create_user': [('d', 'Person D'), ('f', 'Person F')],
         'get_daco_access': ['a', 'b', 'd', 'e', 'f'],
-        'get_daco_users': ['Called']*6,
+        'get_daco_users': ['Called'],
+        'user_exists': ['a', 'b','d','e','f'],
         'grant_access': ['d', 'f'],
         'grant_cloud': ['f'],
         'revoke_access': ['c', 'g', 'h'],

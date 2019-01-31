@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import json
+from collections import OrderedDict
 import sys
 from aes import decrypt_file
+from ego_client import EgoClient
 import csv
 
 from daco_client import DacoClient
@@ -14,7 +16,7 @@ def read_config(name="config/default.conf"):
 def users(data):
     text = data.decode()
     csvreader = csv.DictReader(text.splitlines())
-    return { u['openid']: u['user name'] for u in csvreader}
+    return OrderedDict([ (u['openid'], u['user name']) for u in csvreader])
 
 def send_report(issues):
     print(f"Daco2Ego report\nWe found these issues: {issues}")
@@ -30,8 +32,11 @@ def init(args):
 
     daco_users = users(decrypt_file(config['daco_file'], key, iv))
     cloud_users = users(decrypt_file(config['cloud_file'], key, iv))
+    auth_token = config['client']['auth_token']
+    base_url   = config['client']['base_url']
 
-    client = DacoClient(config['client'], daco_users, cloud_users)
+    ego_client = EgoClient(config[''], base_url, auth_token)
+    client = DacoClient(daco_users, cloud_users, ego_client)
 
     return client
 

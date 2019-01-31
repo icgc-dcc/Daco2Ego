@@ -6,10 +6,16 @@ def format_tuple(name, args):
 def format_exception(e):
     return format_tuple(e.__class__.__name__, e.args)
 
+def get_invalid_users(cloud, all_users):
+    return [c for c in cloud if c not in all_users]
+
+def get_valid_cloud_users(cloud_users, all_users):
+    return [c for c in cloud_users if c in all_users]
+
 class DacoClient(object):
-    def __init__(self, daco_map, cloud_map, ego_client):
+    def __init__(self, users_map, cloud_map, ego_client):
         """
-        :param daco_map:
+        :param users_map:
             An ordered dictionary of user_ids mapped to the CSV dictionary
             (user name,openid,email,csa) read from our DACO file, indicating
             all the users who should have DACO access.
@@ -25,10 +31,14 @@ class DacoClient(object):
         self.issues_log = []
 
         self.ego_client=ego_client
-        self.daco_map = daco_map
+        self.daco_map = users_map
 
-        self.daco_users = list(daco_map.keys())
-        self.cloud_users = list(cloud_map.keys())
+        all_users = list(users_map.keys())
+        cloud_users = list(cloud_map.keys())
+
+        self.invalid_users = get_invalid_users(cloud_users, all_users)
+        self.all_users = all_users
+        self.cloud_users = get_valid_cloud_users(cloud_users, all_users)
 
     def update_ego(self):
         """ Handle scenarios 1-4 wiki specification at
@@ -40,31 +50,19 @@ class DacoClient(object):
             returns: A list of issues encountered
         """
         # scenario 4
-        for user in self.invalid_users():
+        for user in self.invalid_users:
             self.handle_invalid_user(user)
 
-        daco_users = self.valid_daco_users()
         ego_users = self.get_ego_users()
 
         # scenarios 1 & 2
-        for user in daco_users:
+        for user in self.all_users:
             self.handle_access_allowed(user)
 
         # scenario 3
         for user in ego_users:
             self.handle_access_denied(user)
         return self.report_issues()
-
-    def invalid_users(self):
-        return [c for c in self.cloud_users if c not in self.daco_users]
-        #return self.cloud_users - self.daco_users
-
-    def valid_daco_users(self):
-        return self.daco_users
-
-    def valid_cloud_users(self):
-        return [c for c in self.cloud_users if c in self.daco_users]
-        #return self.cloud_users & self.daco_users
 
     def get_user_name(self, user):
         name = None
@@ -75,11 +73,11 @@ class DacoClient(object):
         return name
 
     def has_cloud(self, user):
-        return user in self.valid_cloud_users()
+        return user in self.cloud_users
 
     # scenarios 1 & 2
     def handle_access_allowed(self, user):
-        if user not in self.get_ego_users():
+        if not self.ego_client.user_exists(user):
             # Scenario 1
            self.create_user(user,self.get_user_name(user))
         # scenario 2
@@ -87,9 +85,9 @@ class DacoClient(object):
 
     # scenario 3
     def handle_access_denied(self, user):
-        if user not in self.valid_daco_users():
+        if user not in self.all_users:
             self.revoke_access(user, "user not in daco list")
-        elif user not in self.valid_cloud_users():
+        elif user not in self.cloud_users:
             self.revoke_cloud(user)
 
     # Handle scenario 4 (User has cloud access, but not daco access)
@@ -105,12 +103,6 @@ class DacoClient(object):
         except Exception as e:
             self.err("Can't get list of daco users from ego", e)
         return users
-
-    def log(self, msg):
-        self.issues_log.append(msg)
-
-    def err(self, msg, e):
-        self.issues_log.append(f"Error: {msg} -- {repr(e)}")
 
     # scenario 1
     def create_user(self, user, name):

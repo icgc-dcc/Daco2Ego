@@ -1,171 +1,206 @@
+import requests
+import json
 class EgoClient(object):
-    daco_names = {'portal'}
-    cloud_policy_names = {'aws', 'collab'}
-    all_names = daco_names | cloud_policy_names
+    daco_policies = {'portal'}
+    cloud_policies = {'aws', 'collab'}
+    all_policies = daco_policies | cloud_policies
 
-    def __init__(self):
-        self.rest_client = None
-        self.policy_map= None
-        self.user_cache = None
-        self.mocks = {}
+    def __init__(self, base_url, auth):
+        self.auth = auth
+        self.base_url = base_url
+
+        # cache of policy names to policy ids
+        self._policy_map=None
 
     def _get(self, endpoint):
         # append header 'Authorization:' <our authorization token>
         # return self.rest_client.get(headers, endpoint)
         print(f"Connecting to {endpoint}")
-        return self.mocks[endpoint]
+        headers = {'Authorization': self.auth}
+        r=requests.get(self.base_url + endpoint, headers=headers)
+        if r.ok:
+            return r.text
+        raise IOError("Error trying to GET {r.url}",r)
+
+    def _get_json(self, endpoint):
+        result = self._get(endpoint)
+        j = json.loads(result)
+        return j
 
     def _post(self, endpoint, data):
         # append header 'Authorization:' <our authorization token>
         # return self.rest_client(headers, endpoint)
-        return self.mocks[endpoint]
+        print(f"Posting to {endpoint}")
+        headers = {'Authorization': self.auth, 'Content-type':
+            'application/json'}
+        r=requests.post(self.base_url + endpoint, data=data, headers=headers)
+        if r.ok:
+            return r.text
+        raise IOError(f"Error trying to POST to {endpoint}",r, data)
 
     def _delete(self, endpoint):
-        return self.mocks[endpoint]
+        print(f"Deleting from {endpoint}")
+        headers = {'Authorization': self.auth}
+        return requests.delete(self.base_url+endpoint, headers=headers)
 
-    def get_policies(self):
-        return self._get("/policies")
+    def _field_search(self, endpoint, name, value):
+        query = endpoint + f"?{name}={value}"
+        result = self._get_json(query)
+        if result['count'] == 0:
+            raise IOError(f"No matches for {value} from ego endpoint {query}",
+                          result)
 
-    def get_users(self, policy_id):
-        self._get(f"/policies/{policy_id}/users")
+        # Return only exact matches from the field search
+        matches= [item for item in result['resultSet']
+                              if item[name] == value ]
+        if not matches:
+            raise IOError(f"Can't find {value} in results from endpoint "
+                          f"{query}", result)
+        return matches
 
-    def create_user(self, user, name):
-        json = f'''
-        \{ "email": {user},
-           "name": {name},
-        \}
-        '''
-        return self._post("/users", json)
+    def _get_policies(self):
+        return self._get_json("/policies?limit=999999999")
 
-    def get_user_permissions(self, user):
-        # TODO Write me
-        pass
+    def _get_policy(self, policy_name):
+        items = self._field_search("/policies", "name", policy_name)
+        if len(items) > 1:
+            raise IOError(f"Found multiple policies with name '{policy_name}'",
+                          items)
+        return items[0]
 
-    def delete_user_permission(self,user_id, permission_id):
-        return self._delete(f"users/{user_id}/permissions/{permission_id}")
+    def _get_policy_users(self, permission_name):
+        """
+        Get a list of all the users who have the given permission
+        :param permission_name: An ego policy name (permission name)
+        :return:
+        """
+        policy_id = self._get_policy_id(permission_name)
+        users=self._get_json(f"/policies/{policy_id}/users")
+        return { u['name'] for u in users}
 
-    def grant_user_permission(self, user, policy_id, mask):
+    def _get_user_permissions(self, user):
+        """
+        Get all the permissions for the given user
+        :param user: User's email address
+        :return: A list of permissions
+        """
         user_id = self._ego_user_id(user)
-        json = f'''
-        [ \{ "mask": "{mask}",
-             "policy_id": "{policy_id}",
-          \}
-        ]
-        '''
-        return self._post(f"/users/{user_id}/permissions", json)
+        return self._get_json(f"/users/{user_id}/permissions")
 
+    def _delete_user_permission(self, user_id, permission_id):
+        r = self._delete(f"/users/{user_id}/permissions/{permission_id}")
+        if r.ok:
+            return r
+        raise IOError("Can't delete {permission_id} for user_id {user_id}",r)
+
+    def _grant_user_permission(self, user_id, policy_id, mask):
+        j = json.dumps([{ "mask": mask, "policyId": policy_id}])
+        return self._post(f"/users/{user_id}/permissions", j)
+
+    ### Public api
+    def get_daco_users(self):
+        users = set()
+        for permission in self.all_policies:
+            users |= self._get_policy_users(permission)
+        return users
+
+    def user_exists(self, user):
+        try:
+            self._ego_user_id(user)
+            return True
+        except IOError as e:
+            return False
+
+    def create_user(self, user, name, ego_type="USER"):
+        j = json.dumps({"email": user, "name":name, "type": ego_type,
+                       "status": "Approved" })
+        reply=self._post("/users", j)
+        r = json.loads(reply)
+        return r
+
+    def get_daco_access(self, user):
+        """
+           Return the access to daco permissions that the user has in ego
+        :param user: The user's email address
+        :return: A tuple of booleans indicating whether the user has daco
+                 access, and whether the user has cloud access.
+        """
+        policies = self._get_user_policies(user)
+        return self._has_daco(policies), self._has_cloud(policies)
+
+    def _get_user_policies(self, user):
+        permissions = self._get_user_permissions(user)
+        r = permissions['resultSet']
+        return {item['policy']['name'] for item in r}
+
+    def _has_daco(self, policy_names):
+        return self.daco_policies.issubset(policy_names)
+
+    def _has_cloud(self, policy_names):
+        return self.cloud_policies.issubset(policy_names)
+
+    def grant_cloud(self, user):
+        """
+            Grant cloud access to the given ego user
+        :param user: The user's email address
+        :return: None
+        """
+        self._grant_permissions(user, self.all_policies)
+
+    def grant_access(self, user):
+        self._grant_permissions(user, self.daco_policies)
+
+    def _grant_permissions(self, user, policy_names):
+        for policy in policy_names:
+            policy_id = self._get_policy_id(policy)
+            user_id = self._ego_user_id(user)
+            self._grant_user_permission(user_id, policy_id, 'READ')
 
     def revoke_access(self, user):
-        for policy_id in self._all_policy_ids():
-            self._revoke_permission(user, policy_id)
+        return self.revoke_policies(user, self.all_policies)
 
     def revoke_cloud(self, user):
-        for policy_id in self._cloud_policy_ids():
-            self._revoke_permission(user, policy_id)
+        return self.revoke_policies(user, self.cloud_policies)
 
-    def get_daco_users(self):
-        if self.user_cache is None:
-            self._set_user_cache()
-        return self.user_cache.keys()
+    def revoke_policies(self, user, policies):
+        r = self._get_user_permissions(user)
+        permissions = r['resultSet']
 
-    def get_daco_policies(self, grant_cloud):
-        if grant_cloud:
-            return self._all_policy_ids()
-        else:
-            return self._daco_policy_ids()
+        for policy_name in policies:
+            for p in permissions:
+                if p['policy']['name'] == policy_name:
+                    permission_id = p['id']
+                    self._revoke_permission(user, permission_id)
 
-    def _revoke_permission(self, user, policy_id):
+    def _revoke_permission(self, user, permission_id):
         user_id = self._ego_user_id(user)
-        self.delete_user_permission(user_id, policy_id)
+        self._delete_user_permission(user_id, permission_id)
+
+    def _ego_user_id(self, user):
+        """
+        Find the user's ego id based upon their email
+        :param user: The user's email address (as stored in ego)
+        :return: The user's ego id as a string (or an IOError is raised)
+        """
+        users = self._field_search("/users", "email", user)
+        if len(users) > 1:
+            raise IOError("Found multiple ids for user {user}", user)
+        return users[0]['id']
+
+    def _get_policy_id(self, name):
+        if self._policy_map is None:
+            self._policy_map = self._get_policy_map()
+        return self._policy_map[name]
 
     # We translate policy names (which define DACO) into ego ID numbers,
     # which ego uses internally, and cache them for efficiency.
-
-    # Similarly, we need to use the EGO specific user-id rather than the
-    # email field that daco uses to identify the user
-
-    # We cache a map of the policy names to the DACO policies, and their
-    # categories (only 3).
-
-    # We also keep a mapping of all of the users with DACO related permissions
-    # from their DACO id to their EGO id, so that we can update the ego
-    # permissions for a given DACO user as necessary.
-    def _ego_user_id(self, user):
-        """ Get the ego user id for the given user from the cache
-            Create cache by querying ego if we haven't done it yet.
-        """
-        if self.user_cache is None:
-            self._set_user_cache()
-        return self.user_cache[user]
-
     def _get_policy_map(self):
         """
-        Query ego for all of the policies, and
-        create map of policy names to policy ids
+            Convert our sets of policy names to set of ego's policy_ids
         """
         policy_map = {}
-        data = self.get_policies()
-        for row in data['result_set']:
-            policy_map[row['name']] = row['id']
+        # get all the policy definitions from ego
+        for name in self.all_policies:
+            policy = self._get_policy(name)
+            policy_map[name] = policy['id']
         return policy_map
-
-    def _set_policies(self):
-        """
-            Convert our sets of policy names to set of policy_ids within ego.
-        """
-        policy_map = self._get_policy_map()
-        def p(name):
-            return policy_map[name]
-
-        self.all_policies = set(map(p, self.all_names))
-        self.daco_policies = set(map(p, self.daco_names))
-        self.cloud_policies = set(map(p, self.cloud_policy_names))
-
-    def _all_policy_ids(self):
-        if self.all_policies is None:
-            self._set_policies()
-        return self.all_policies
-
-    def _cloud_policy_ids(self):
-        if self.cloud_policies is None:
-            self._set_policies()
-        return self.cloud_policies
-
-    def _daco_policy_ids(self):
-        if self.daco_policies is None:
-            self._set_policies()
-        return self.daco_policies
-
-    def _update_users(self, user, user_id):
-        if self.user_cache is None:
-            self._set_user_cache()
-        self.user_cache[user] = user_id
-
-    def _set_user_cache(self):
-        cache = {}
-        for policy_id in self._all_policy_ids():
-            users = self.get_users(policy_id)
-            for u in users:
-                cache[u['name']] = u['id']
-        self.user_cache = cache
-
-    def ensure_access(self, user, grant_cloud):
-        permissions = self.get_user_permissions(user)['resultSet']
-        policies = self.get_daco_policies(grant_cloud)
-
-        for policy_id in policies:
-            need_permission = self._has_policy(policy_id, permissions)
-            if need_permission:
-                    self.grant_user_permission(user, policy_id,"READ")
-
-    def _has_policy(self, policy_id, permissions):
-        for permission in permissions:
-            if permission['policy']['id'] == policy_id:
-                return True
-        return False
-
-
-
-
-
-

@@ -35,6 +35,10 @@ class MockEgoSuccess(MockIO):
     def revoke_cloud(self, user):
         self.log_call('revoke_cloud', user)
 
+    def user_exists(self, user):
+        self.log_call('user_exists', user)
+        return user in self._daco_users
+
     def get_daco_users(self):
         self.log_call('get_daco_users', 'Called')
         return self._daco_users.keys()
