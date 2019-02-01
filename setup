@@ -1,0 +1,30 @@
+#!/bin/sh
+
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_192.jdk/Contents/Home/
+kill `ps ax | grep ego | grep java | cut -d " " -f1`
+
+psql <<"EOT"
+drop database ego; create database ego;
+EOT
+
+here=`pwd`
+cd ~/projects/overture-stack/ego
+./fly migrate
+cd $here
+
+psql ego <<"EOT" 
+insert into egoapplication (name,clientid,clientsecret,status,type) values ('daco2ego','daco2ego','daco','Approved','ADMIN');
+insert into egogroup (name, status) values ('daco_access','Approved');
+insert into egogroup (name, status) values ('daco_cloud','Approved');
+insert into policy (id,owner,name) select uuid_generate_v4(),G.id,'portal' from egogroup G where G.name='daco_access';
+
+insert into policy (id,owner,name) select uuid_generate_v4(),G.id,'aws' from egogroup G where G.name='daco_cloud';
+insert into policy (id,owner,name) select uuid_generate_v4(),G.id,'collab' from egogroup G where G.name='daco_cloud';
+EOT
+
+cd ~/projects/overture-stack/ego
+SPRING_PROFILES_ACTIVE=auth mvn spring-boot:run > $here/ego.log &
+#SPRING_PROFILES_ACTIVE=auth mvn spring-boot:run
+cd $here
+
+

@@ -19,7 +19,8 @@ def users(data):
     return OrderedDict([ (u['openid'], u['user name']) for u in csvreader])
 
 def send_report(issues):
-    print(f"Daco2Ego report\nWe found these issues: {issues}")
+    for issue in issues:
+        print(issue) 
 
 def init(args):
     if args:
@@ -34,9 +35,10 @@ def init(args):
     cloud_users = users(decrypt_file(config['cloud_file'], key, iv))
     auth_token = config['client']['auth_token']
     base_url   = config['client']['base_url']
+    verbose_log = config['verbose']
 
     ego_client = EgoClient(base_url, auth_token)
-    client = DacoClient(daco_users, cloud_users, ego_client)
+    client = DacoClient(daco_users, cloud_users, ego_client,verbose=verbose_log)
 
     return client
 

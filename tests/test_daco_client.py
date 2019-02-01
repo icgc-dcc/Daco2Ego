@@ -184,7 +184,7 @@ def test_grant_access():
     d = DacoClient({}, {}, e)
     user = 'person@gmail.com'
 
-    d.grant_access(user)
+    d.grant_daco(user)
     assert e.get_calls() == {'grant_access': [user]}
 
     expected = f"Granted daco access to user '{user}'"
@@ -196,7 +196,7 @@ def test_access_fail():
     d = DacoClient({},{}, e)
     user = 'person@gmail.com'
 
-    d.grant_access(user)
+    d.grant_daco(user)
     assert e.get_calls() == {'grant_access': [user]}
     msg = f"Can't grant daco access to user '{user}'"
     expected = err_msg(msg, 'grant_access', user)
