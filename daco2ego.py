@@ -35,7 +35,7 @@ def init(args):
     auth_token = config['client']['auth_token']
     base_url   = config['client']['base_url']
 
-    ego_client = EgoClient(config[''], base_url, auth_token)
+    ego_client = EgoClient(base_url, auth_token)
     client = DacoClient(daco_users, cloud_users, ego_client)
 
     return client
