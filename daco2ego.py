@@ -4,6 +4,7 @@ from collections import OrderedDict
 import sys
 from aes import decrypt_file
 from ego_client import EgoClient
+from requests import Session
 import csv
 
 from daco_client import DacoClient
@@ -37,7 +38,8 @@ def init(args):
     base_url   = config['client']['base_url']
     verbose_log = config['verbose']
 
-    ego_client = EgoClient(base_url, auth_token)
+    rest_client = Session()
+    ego_client = EgoClient(base_url, auth_token, rest_client)
     client = DacoClient(daco_users, cloud_users, ego_client,verbose=verbose_log)
 
     return client

@@ -4,13 +4,14 @@ from daco_client import DacoClient, format_exception
 from mock_ego_client import (MockEgoSuccess, MockEgoException,
                              MockEgoFailure, ex_name)
 
-daco=OrderedDict({'a': 'Person A', 'b':'Person B', 'd':'Person D',
-      'e': 'Person E','f':'Person F'})
-cloud=OrderedDict({'b': 'Person B','c': 'Person C', 'f':'Person F',
-       'g': 'Person G'})
+daco=OrderedDict({'a@ca': 'Person A', 'b@ca':'Person B',
+                  'd@ca':'Person D','e@ca': 'Person E','f@ca':'Person F'})
+cloud=OrderedDict({'b@ca': 'Person B','c@ca': 'Person C', 'f@ca':'Person F',
+       'g@ca': 'Person G'})
 
-ego = OrderedDict({'a':(True, False),'b':(True, True),'e':(True, False),
-                'h':(True, True)})
+ego = OrderedDict({'a@ca':(True, False),'b@ca':(True, True),
+                   'e@ca':(True, False),'g@ca':(True, True),
+                   'h@ca':(True, True), 'c@ca':(False, True)})
 
 def err_msg(msg, name, *args):
         ex = ex_name(name, *args)
@@ -43,17 +44,17 @@ def test_err():
 def test_invalid():
     d=DacoClient(daco, cloud, None)
     invalid = d.invalid_users
-    assert invalid == ['c','g']
+    assert invalid == ['c@ca','g@ca']
 
 def test_valid_daco():
     d = DacoClient(daco, cloud, None)
     valid = d.all_users
-    assert valid == ['a','b','d', 'e', 'f']
+    assert valid == ['a@ca','b@ca','d@ca', 'e@ca', 'f@ca']
 
 def test_valid_cloud():
     d = DacoClient(daco, cloud, None)
     valid = d.cloud_users
-    assert valid == ['b','f']
+    assert valid == {'b@ca','f@ca'}
 
 def test_user_name_success():
     user = "a.person@gmail.com"
@@ -180,26 +181,27 @@ def test_revoke_cloud_fail():
     assert report == [expected]
 
 def test_grant_access():
-    e = MockEgoSuccess(ego)
-    d = DacoClient({}, {}, e)
     user = 'person@gmail.com'
+    e = MockEgoSuccess({user:(False, False)})
+    d = DacoClient({}, {}, e)
+
 
     d.grant_daco(user)
-    assert e.get_calls() == {'grant_access': [user]}
-
     expected = f"Granted daco access to user '{user}'"
     report = d.report_issues()
     assert report == [expected]
 
+    assert e.get_calls() == {'grant_daco': [user]}
+
 def test_access_fail():
-    e = MockEgoFailure(ego)
-    d = DacoClient({},{}, e)
     user = 'person@gmail.com'
+    e = MockEgoFailure({user:(False, False)})
+    d = DacoClient({},{}, e)
 
     d.grant_daco(user)
-    assert e.get_calls() == {'grant_access': [user]}
+    assert e.get_calls() == {'grant_daco': [user]}
     msg = f"Can't grant daco access to user '{user}'"
-    expected = err_msg(msg, 'grant_access', user)
+    expected = err_msg(msg, 'grant_daco', user)
     report = d.report_issues()
     assert report == [expected]
 
@@ -232,95 +234,121 @@ def test_grant_cloud_fail():
 def test_get_daco_access():
     e = MockEgoSuccess(ego)
     d = DacoClient({}, {}, e)
-    user = 'a'
+    user = 'a@ca'
 
-    assert d.get_daco_access(user) == ego[user]
-    assert e.get_calls() == {'get_daco_access': [user]}
+    has_daco = e.has_daco(user)
+    has_cloud  = e.has_cloud(user)
+
+    (has_daco, has_cloud) == ego[user]
+    assert e.get_calls() == {'has_daco': [user], 'has_cloud':[user]}
 
     # don't report permissions lookup unless it fails
     report = d.report_issues()
     assert report == []
 
-def test_daco_access_fail():
+def test_has_daco_fail():
     e = MockEgoFailure(ego)
     d = DacoClient({}, {}, e)
-    user = 'a'
+    user = 'a@ca'
     msg = None
 
     try:
-       d.get_daco_access(user)
+       e.has_daco(user)
     except MockEgoException as ex:
         msg = repr(ex)
 
-    assert e.get_calls() == { 'get_daco_access': [user] }
+    assert e.get_calls() == { 'has_daco': [user] }
 
-    assert msg == f"MockEgoException('{ex_name('get_daco_access',user)}')"
+    assert msg == f"MockEgoException('{ex_name('has_daco',user)}')"
+
+def test_has_cloud_fail():
+    e = MockEgoFailure(ego)
+    d = DacoClient({}, {}, e)
+    user = 'a@ca'
+    msg = None
+
+    try:
+       e.has_cloud(user)
+    except MockEgoException as ex:
+        msg = repr(ex)
+
+    assert e.get_calls() == { 'has_cloud': [user] }
+
+    assert msg == f"MockEgoException('{ex_name('has_cloud',user)}')"
+
 
 def test_ensure_access():
     e = MockEgoSuccess(ego)
     d = DacoClient({}, {}, e)
-    user = 'a'
+    user = 'a@ca'
     grant_cloud=True
     d.ensure_access(user, grant_cloud)
 
-    expected = [f"User '{user}' already has daco access",
-                f"Granted cloud access to user '{user}'" ]
+    expected = [f"Granted cloud access to user '{user}'" ]
     report = d.report_issues()
     assert report == expected
 
 def test_ensure2():
     e = MockEgoSuccess(ego)
     d = DacoClient({}, {}, e)
-    user = 'a'
+    user = 'a@ca'
     grant_cloud=False
     d.ensure_access(user, grant_cloud)
 
-    expected = [f"User '{user}' already has daco access"]
+    expected = []
     report = d.report_issues()
     assert report == expected
 
 def test_ensure3():
-    e = MockEgoSuccess(ego)
+    e = MockEgoFailure(ego)
     d = DacoClient({},{}, e)
-    user = 'f'
+    user = 'f@ca'
     grant_cloud=True
 
     d.ensure_access(user, grant_cloud)
-    msg1 = f"Can't get ego settings for user '{user}'"
+    msg1 = f"Can't tell if user '{user}' has daco access"
     msg2 = f"MockEgoException(User '{user}' does not exist in ego)"
+    err = f"Error: {msg1} -- {msg2}"
+    missing =  f"KeyError({user})"
 
-
-    expected = [f"Error: {msg1} -- {msg2}"]
+    expected = [err,
+                f"Error: Can't grant daco access to user '{user}' -- "
+                + missing,
+                err,
+                f"Error: Can't grant cloud access to user '{user}' -- "+
+                f"MockEgoException(grant_cloud({user}))",
+                ]
 
     report = d.report_issues()
+    print(f"We got: {report}")
+
     assert report == expected
 
 def test_allowed1():
     e=MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
     # user a is already set up correctly in ego
-    user='a'
+    user='a@ca'
     d.handle_access_allowed(user)
 
     assert e.get_calls() == { 'user_exists': [user],
-                              'get_daco_access': [user]
+                              'has_daco': [user]
                             }
-    expected = f"User '{user}' already has daco access"
     report = d.report_issues()
-    assert report == [expected]
+    assert report == []
 
 def test_allowed2():
     e=MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
-    user='b'
+    user='b@ca'
     # user b is already in Ego. He should have access to DACO and to Cloud
     d.handle_access_allowed(user)
     assert e.get_calls() == {'user_exists': [user],
-                             'get_daco_access': [user]
+                             'has_daco': [user],
+                             'has_cloud': [user]
                              }
 
-    expected = [f"User '{user}' already has daco access",
-                f"User '{user}' already has cloud access"]
+    expected = []
     report = d.report_issues()
 
     assert report == expected
@@ -329,12 +357,13 @@ def test_allowed3():
     e=MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
     # user f is not in Ego. He should have access to DACO, and cloud.
-    user='f'
+    user='f@ca'
     d.handle_access_allowed(user)
     assert e.get_calls() == {'user_exists': [user],
-                             'get_daco_access': [user],
+                             'has_daco': [user],
+                             'has_cloud': [user],
                              'create_user': [(user, daco[user])],
-                             'grant_access': [user],
+                             'grant_daco': [user],
                              'grant_cloud': [user]
                              }
 
@@ -349,7 +378,7 @@ def test_denied1():
     e = MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
     # user 'b' is in Ego, and should still keep EGO and Cloud
-    user='b'
+    user='b@ca'
     # We shouldn't change or log anything
     d.handle_access_denied(user)
 
@@ -361,10 +390,11 @@ def test_denied1():
 def test_denied2():
     e = MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
-    user='g'
-    # user 'g' is in Ego, but no longer has DACO or cloud.
+    user='g@ca'
+    # User g' should no longer have DACO or cloud.
     d.handle_access_denied(user)
-    assert e.get_calls() == { 'revoke_access': [user] }
+    assert e.get_calls() == { 'has_daco':[user],
+                              'revoke_access': [user] }
 
     # ensure we logged the revoked access
     reason = "user not in daco list"
@@ -375,15 +405,18 @@ def test_denied2():
 def test_denied3():
     e = MockEgoSuccess(ego)
     d = DacoClient(daco, cloud, e)
-    user='e'
-    # user 'e' is in Ego, and has DACO, but not cloud.
-    d.handle_access_denied('e')
+    user='e@ca'
+    # User e should have  DACO, but not cloud.
+    # We should check to see if he has cloud (he doesn't).
 
-    assert e.get_calls() == {'revoke_cloud': [user]}
+    # We don't need to revoke his access, so nothing should be in the log.
+    d.handle_access_denied(user)
+
+    assert e.get_calls() == { 'has_cloud': [user]}
     # ensure we logged the revoked access
-    expected = f"Revoked cloud access for user 'e'"
+    #expected = f"Revoked cloud access for user 'e'"
     report = d.report_issues()
-    assert report == [expected]
+    assert report == []
 
 
 def test_update_ego():
@@ -393,32 +426,31 @@ def test_update_ego():
     d.update_ego()
 
     expected =[
-        "Revoked all daco access for user 'c':(user in csa file but not in DACO file)",
-        "Revoked all daco access for user 'g':(user in csa file but not in DACO file)",
-        "User 'a' already has daco access",
-        "User 'b' already has daco access",
-        "User 'b' already has cloud access",
-        'Created account for user d with name Person D',
-        "Granted daco access to user 'd'",
-        "User 'e' already has daco access",
-        'Created account for user f with name Person F',
-        "Granted daco access to user 'f'",
-        "Granted cloud access to user 'f'",
-        "Revoked cloud access for user 'a'",
-        "Revoked cloud access for user 'e'",
-        "Revoked all daco access for user 'h':(user not in daco list)",
-        "Revoked cloud access for user 'd'"]
+        "Revoked all daco access for user 'c@ca':(user in csa file but not in "
+        "DACO file)",
+        "Revoked all daco access for user 'g@ca':(user in csa file but not in "
+        "DACO file)",
+        'Created account for user d@ca with name Person D',
+        "Granted daco access to user 'd@ca'",
+        'Created account for user f@ca with name Person F',
+        "Granted daco access to user 'f@ca'",
+        "Granted cloud access to user 'f@ca'",
+        "Revoked all daco access for user 'h@ca':(user not in daco list)",
+    ]
     report = d.report_issues()
     assert report == expected
 
+    print(e.get_calls())
 
     assert e.get_calls() == {
-        'create_user': [('d', 'Person D'), ('f', 'Person F')],
-        'get_daco_access': ['a', 'b', 'd', 'e', 'f'],
+        'create_user': [('d@ca', 'Person D'), ('f@ca', 'Person F')],
+        'has_daco': ['c@ca','g@ca','a@ca', 'b@ca', 'd@ca', 'e@ca', 'f@ca',
+                     'g@ca','h@ca','c@ca'],
+        'has_cloud': ['c@ca','b@ca', 'f@ca','a@ca','e@ca','g@ca',
+                      'c@ca','d@ca'],
         'get_daco_users': ['Called'],
-        'user_exists': ['a', 'b','d','e','f'],
-        'grant_access': ['d', 'f'],
-        'grant_cloud': ['f'],
-        'revoke_access': ['c', 'g', 'h'],
-        'revoke_cloud': ['a', 'e', 'd']
+        'user_exists': ['a@ca', 'b@ca','d@ca','e@ca','f@ca'],
+        'grant_daco': ['d@ca', 'f@ca'],
+        'grant_cloud': ['f@ca'],
+        'revoke_access': ['c@ca', 'g@ca', 'h@ca'],
     }

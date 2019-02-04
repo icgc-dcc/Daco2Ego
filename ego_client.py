@@ -1,11 +1,10 @@
-import requests
 import json
 class EgoClient(object):
     daco_policies = {'portal'}
     cloud_policies = {'aws', 'collab'}
     all_policies = daco_policies | cloud_policies
 
-    def __init__(self, base_url, auth):
+    def __init__(self, base_url, auth, rest_client):
         self.auth = auth
         self.base_url = base_url
 
@@ -13,13 +12,15 @@ class EgoClient(object):
         self._permission_map=None   # dict of { policy_name: set( user_name) }
         self._user_map=None         # dict of { user_name: user_id }
         self._ego_users=None        # set( user_name )
+        self._rest_client = rest_client
+        self._rest_client.stream = False
 
     def _get(self, endpoint):
         # append header 'Authorization:' <our authorization token>
         # return self.rest_client.get(headers, endpoint)
         #print(f"Connecting to {endpoint}")
         headers = {'Authorization': self.auth}
-        r=requests.get(self.base_url + endpoint, headers=headers)
+        r=self._rest_client.get(self.base_url + endpoint, headers=headers)
         if r.ok:
             return r.text
         raise IOError("Error trying to GET {r.url}",r)
@@ -35,7 +36,8 @@ class EgoClient(object):
         #print(f"Posting to {endpoint}")
         headers = {'Authorization': self.auth, 'Content-type':
             'application/json'}
-        r=requests.post(self.base_url + endpoint, data=data, headers=headers)
+        r=self._rest_client.post(self.base_url + endpoint, data=data,
+                                 headers=headers)
         if r.ok:
             return r.text
         raise IOError(f"Error trying to POST to {endpoint}",r, data)
@@ -43,7 +45,7 @@ class EgoClient(object):
     def _delete(self, endpoint):
         #print(f"Deleting from {endpoint}")
         headers = {'Authorization': self.auth}
-        return requests.delete(self.base_url+endpoint, headers=headers)
+        return self._rest_client.delete(self.base_url + endpoint, headers=headers)
 
     def _field_search(self, endpoint, name, value):
         query = endpoint + f"?{name}={value}&limit=9999999"
@@ -81,15 +83,6 @@ class EgoClient(object):
         # This is actually the email, even though it says name
         return { u['name'].lower() for u in users}
 
-    # def _get_user_permissions(self, user):
-    #     """
-    #     Get all the permissions for the given user
-    #     :param user: User's email address
-    #     :return: A list of permissions
-    #     """
-    #     user_id = self._user_id(user)
-    #     return self._get_json(f"/users/{user_id}/permissions")
-
     def _get_user_permissions(self, user):
         m = self._get_permission_map()
         return {p for p in self.all_policies if user in m[p]}
@@ -123,13 +116,6 @@ class EgoClient(object):
         for permission in self.all_policies:
             users |= m[permission]
         return users
-
-    # def user_exists(self, user):
-    #     try:
-    #         self._user_id(user)
-    #         return True
-    #     except IOError as e:
-    #         return False
 
     def user_exists(self, user):
         if self._ego_users is None:

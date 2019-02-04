@@ -19,36 +19,48 @@ class MockEgoSuccess(MockIO):
         super(MockEgoSuccess, self).__init__()
         self._daco_users = OrderedDict(users)
 
-    def create_user(self, user, name):
-        self._daco_users[user] = (False, False)
-        self.log_call('create_user', (user,name))
-
-    def grant_access(self, user):
-        self.log_call('grant_access', user)
-
-    def revoke_access(self, user):
-        self.log_call('revoke_access', user)
-
-    def grant_cloud(self, user):
-        self.log_call('grant_cloud', user)
-
-    def revoke_cloud(self, user):
-        self.log_call('revoke_cloud', user)
+    def get_daco_users(self):
+        self.log_call('get_daco_users', 'Called')
+        return self._daco_users.keys()
 
     def user_exists(self, user):
         self.log_call('user_exists', user)
         return user in self._daco_users
 
-    def get_daco_users(self):
-        self.log_call('get_daco_users', 'Called')
-        return self._daco_users.keys()
+    def create_user(self, user, name):
+        self._daco_users[user] = (False, False)
+        self.log_call('create_user', (user,name))
 
-    def get_daco_access(self, user):
-        self.log_call('get_daco_access', user)
+    def has_daco(self, user):
+        self.log_call('has_daco', user)
         try:
-            return self._daco_users[user]
+            return self._daco_users[user][0]
         except KeyError:
             raise MockEgoException(f"User '{user}' does not exist in ego")
+
+    def grant_daco(self, user):
+        cloud=self._daco_users[user][1]
+        self._daco_users[user]=(True, cloud)
+        self.log_call('grant_daco', user)
+
+    def revoke_access(self, user):
+        self._daco_users[user]=(False, False)
+        self.log_call('revoke_access', user)
+
+    def has_cloud(self, user):
+        self.log_call('has_cloud', user)
+        try:
+            return self._daco_users[user][1]
+        except KeyError:
+            raise MockEgoException(f"User '{user}' does not exist in ego")
+
+    def grant_cloud(self, user):
+        self._daco_users[user] = (True, True)
+        self.log_call('grant_cloud', user)
+
+    def revoke_cloud(self, user):
+        self._daco_users[user]=(True, False)
+        self.log_call('revoke_cloud', user)
 
 def log_function(f):
     def wrapper(self, *args, **kwargs):

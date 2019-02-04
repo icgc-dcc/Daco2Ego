@@ -123,7 +123,7 @@ class DacoClient(object):
             if self.ego_has_daco(user) or self.ego_has_cloud(user):
                 self.revoke_access(user, "user not in daco list")
             else:
-                self.err(f"Ego user '{user}' lost daco on their own???")
+                self.verbose(f"Someone else with admin access must have revoked daco access for '{user}' in ego between the time we started running daco2ego and now...")
         elif user not in self.cloud_users:
             #self.verbose(f"Ego user '{user}' is not on cloud list")
             if self.ego_has_cloud(user):
