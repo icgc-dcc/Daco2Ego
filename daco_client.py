@@ -1,45 +1,19 @@
-def format_tuple(name, args):
-    if len(args) == 1:
-        return f"{name}({args[0]})"
-    return f"{name}{args}"
-
-def format_exception(e):
-    return format_tuple(e.__class__.__name__, e.args)
-
-def get_invalid_users(cloud, all_users):
-    return [c for c in cloud if c not in all_users]
-
-def get_valid_cloud_users(cloud_users, all_users):
-    return {c for c in cloud_users if c in all_users}
-
+from format_errors import err_msg
+from user import User
 class DacoClient(object):
-    def __init__(self, users_map, cloud_map, ego_client, verbose=False):
+    def __init__(self, users, ego_client):
         """
-        :param users_map:
-            An ordered dictionary of user_ids mapped to the CSV dictionary
-            (user name,openid,email,csa) read from our DACO file, indicating
-            all the users who should have DACO access.
-
-        :param cloud_map:
-            A dictionary that of the same sort as above, but for users
-            who should have cloud access.
+        :param users: A list of User objects
 
         :param ego_client:
             An EgoClient object that applies the requested changes
             to the Ego server.
         """
-        self.issues_log = []
-        self.verbose_messages=verbose
-
         self.ego_client=ego_client
-        self.daco_map = users_map
-
-        all_users = list(users_map.keys())
-        cloud_users = list(cloud_map.keys())
-
-        self.invalid_users = get_invalid_users(cloud_users, all_users)
-        self.all_users = all_users
-        self.cloud_users = get_valid_cloud_users(cloud_users, all_users)
+        self.users = users
+        # make a map of ego id == user.email to user, so that we can
+        # find ego users with daco permissions.
+        self._user_map = { u.email:u for u in users }
 
     def update_ego(self):
         """ Handle scenarios 1-4 wiki specification at
@@ -50,165 +24,180 @@ class DacoClient(object):
 
             returns: A list of issues encountered
         """
-        # scenario 4 (revoke invalid )
-        for user in self.invalid_users:
-            self.handle_invalid_user(user)
 
-        # scenarios 1 & 2 (grant access)
-        for user in self.all_users:
-            if user.find('@') == -1:
-                self.log(f"Error: User '{user}' is not a valid email address")
-                continue
-            self.handle_access_allowed(user)
+        return (list(self.grant()) +
+                list(self.revoke()))
 
-        # scenario 3 (revoke access)
-        ego_users = self.get_ego_users()
+    def grant(self):
+        return self.grant_users(self.users)
 
-        for user in ego_users:
-            self.handle_access_denied(user)
-        return self.report_issues()
+    def grant_users(self, users):
+        return filter(None, map(self.grant_user, users))
 
-    def get_user_name(self, user):
-        name = None
+    def grant_user(self, user):
         try:
-            name = self.daco_map[user]
-        except KeyError as e:
-            self.err(f"Can't get name for user {user}", e)
-        return name
+            return self.grant_access_if_necessary(user)
+        except LookupError as e:
+            return err_msg(e.args[0], e.args[1])
 
-    def has_cloud(self, user):
-        return user in self.cloud_users
-
-    # scenarios 1 & 2
-    def handle_access_allowed(self, user):
-        # scenario 1
-        self.ensure_user_exists(user)
-
-        # scenario 2
-        self.ensure_access(user, self.has_cloud(user))
-
-    # scenario 1 (create user if necessary)
-    def ensure_user_exists(self, user):
-        if not self.user_in_ego(user):
-            name = self.get_user_name(user)
-            # Scenario 1
-            self.verbose(f"Creating ego user '{user}({name})")
-            self.create_user(user,name)
-        else:
-            self.verbose(f"User {user} is already in ego")
-
-    def user_in_ego(self, user):
+    def revoke(self):
         try:
-            return self.ego_client.user_exists(user)
+            ego_id_list = self.ego_client.get_daco_users()
         except Exception as e:
-            self.err(f"Can't tell if user '{user} exists in ego", e)
+            return err_msg("Can't get list of daco_users from ego",e)
+        return self.revoke_users(self.get_ego_users(ego_id_list))
 
-    # secenario 2 ( grant user correct permissions )
-    def ensure_access(self, user, has_cloud):
-        if not self.ego_has_daco(user):
-            self.grant_daco(user)
-        else:
-            self.verbose(f"User '{user}' already has daco access")
+    def get_ego_users(self, ego_id_list):
+       return map(self.get_ego_user, ego_id_list)
 
-        if has_cloud:
-            if not self.ego_has_cloud(user):
-                self.grant_cloud(user)
-            else:
-                self.verbose(f"User '{user} already has cloud access")
-
-    # scenario 3 ( remove incorrect permissions )
-    def handle_access_denied(self, user):
-        if user not in self.daco_map:
-            self.verbose(f"Ego user '{user}' is not on daco list")
-            if self.ego_has_daco(user) or self.ego_has_cloud(user):
-                self.revoke_access(user, "user not in daco list")
-            else:
-                self.verbose(f"Someone else with admin access must have revoked daco access for '{user}' in ego between the time we started running daco2ego and now...")
-        elif user not in self.cloud_users:
-            #self.verbose(f"Ego user '{user}' is not on cloud list")
-            if self.ego_has_cloud(user):
-                self.revoke_cloud(user)
-            else:
-                self.verbose(f"Ego user '{user}' doesn't have cloud access("
-                             f"correct)")
-        else:
-            self.verbose(f"Ego user '{user}' has correct permissions")
-
-    # Handle scenario 4 (User has cloud access, but not daco access)
-    def handle_invalid_user(self, user):
-       if self.ego_has_daco(user) or self.ego_has_cloud(user):
-            self.revoke_access(user, "user in csa file but not in DACO file")
-       else:
-           self.verbose(f"Invalid user '{user} doesn't have DACO access")
-
-    def get_ego_users(self):
-        """ Get all users from ego with daco related policies
-        """
-        users = {}
+    def get_ego_user(self, ego_id):
         try:
-            users = self.ego_client.get_daco_users()
-        except Exception as e:
-            self.err("Can't get list of daco users from ego", e)
-        return users
+            return self._user_map[ego_id]
+        except KeyError:
+            return User(ego_id, None, False, False)
+
+    def revoke_users(self, users):
+        return filter(None, map(self.revoke_access_if_necessary, users))
+
+    def revoke_user(self, user):
+        try:
+            return self.revoke_access_if_necessary(user)
+        except LookupError as e:
+            return err_msg(e.args[0],e.args[1])
+
+    def grant_access_if_necessary(self, user):
+        if user.invalid_email():
+            return (f"Error: User '{user}' does not have a valid email "
+                     f"address")
+
+        if user.is_invalid():
+            return None
+
+        if self.ego_client.user_exists(user.email):
+            return self.existing_user(user)
+        return self.new_user(user)
 
     # scenario 1
-    def create_user(self, user, name):
+    def new_user(self, user):
+        self.create_user(user)
+        self.grant_daco(user)
+
+        if not user.has_cloud:
+            return f"Created user '{user}' with daco access"
+
+        self.grant_cloud(user)
+        return f"Created user '{user}' with cloud access"
+
+    # scenario 2
+    def existing_user(self, user):
+        granted_daco, granted_cloud = False, False
+
+        if not self.has_daco(user):
+            self.grant_daco(user)
+            granted_daco = True
+
+        if user.has_cloud and not self.has_cloud(user):
+                self.grant_cloud(user)
+                granted_cloud = True
+
+        if granted_daco and granted_cloud:
+            return f"Granted daco and cloud to existing user '{user}'"
+        elif granted_daco:
+           return f"Granted daco to existing user '{user}'"
+        elif granted_cloud:
+            return f"Granted cloud to existing user '{user}"
+        else:
+            #return f"Existing user '{user}' was set up correctly."
+            return None
+
+    # scenarios 3 and 4
+    def revoke_access_if_necessary(self, user):
+        if user.is_invalid():
+            self.revoke_access(user)
+            return f"Revoked all access for invalid user '{user}':( on" \
+                   f"cloud access list, but not DACO"
+
+        if not user.has_daco:
+            self.revoke_access(user)
+            return f"Revoked all access for user '{user}'"
+
+        if not user.has_cloud:
+           if self.ego_client.has_cloud(user):
+               self.revoke_cloud(user)
+               return f"Revoked cloud access for user '{user}'"
+        return None
+
+    # Wrap all calls to our ego_client LookupErrors with nice messages
+    # for us to display if they happen.
+    def fetch_ego_ids(self, msg=None):
+        """ Get all users from ego with daco related policies
+        """
+        if msg is None:
+            msg = "Can't get list of daco users from ego"
         try:
-            self.ego_client.create_user(user, name)
-            self.log(f"Created account for user {user} with name {name}")
+            return self.ego_client.get_daco_users()
         except Exception as e:
-            self.err(f"Can't create user '{user}'", e)
+            raise LookupError(msg, e)
 
-    def revoke_access(self, user, reason):
+    def user_exists(self, user):
         try:
-            self.ego_client.revoke_access(user)
-            self.log(f"Revoked all daco access for user '{user}':({reason})")
+            return self.ego_client.user_exists(user.email)
         except Exception as e:
-            self.err(f"Can't revoke daco access for user '{user}'", e)
+            raise LookupError(f"Can't tell if user '{user} is already in "
+                              f"ego", e)
 
-    def revoke_cloud(self, user):
+    def create_user(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't create user '{user}'"
         try:
-            self.ego_client.revoke_cloud(user)
-            self.log(f"Revoked cloud access for user '{user}'")
+            self.ego_client.create_user(user.email, user.name)
         except Exception as e:
-            self.err(f"Can't revoke cloud access for user '{user}'", e)
+            raise LookupError(msg, e)
 
-    def grant_cloud(self, user):
+    def has_daco(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't determine if user '{user}' has daco access"
         try:
-            self.ego_client.grant_cloud(user)
-            self.log(f"Granted cloud access to user '{user}'")
+            return self.ego_client.has_daco(user.email)
         except Exception as e:
-            self.err(f"Can't grant cloud access to user '{user}'",e)
+            raise LookupError(msg, e)
 
-    def grant_daco(self, user):
+    def has_cloud(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't determine if user '{user}' has cloud access"
         try:
-            self.ego_client.grant_daco(user)
-            self.log(f"Granted daco access to user '{user}'")
+            return self.ego_client.has_cloud(user.email)
         except Exception as e:
-            self.err(f"Can't grant daco access to user '{user}'", e)
+            raise LookupError(msg, e)
 
-    def ego_has_daco(self, user):
+    def grant_daco(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't grant daco access to user '{user}'"
         try:
-            return self.ego_client.has_daco(user)
+            self.ego_client.grant_daco(user.email)
         except Exception as e:
-            self.err(f"Can't tell if user '{user}' has daco access", e)
+           raise LookupError(msg, e)
 
-    def ego_has_cloud(self, user):
+    def grant_cloud(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't grant cloud access to user '{user}'"
         try:
-            return self.ego_client.has_cloud(user)
+            self.ego_client.grant_cloud(user.email)
         except Exception as e:
-            self.err(f"Can't tell if user '{user}' has daco access", e)
+           raise LookupError(msg, e)
 
-    def report_issues(self):
-        return self.issues_log
+    def revoke_access(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't revoke daco access for user '{user}'"
+        try:
+            self.ego_client.revoke_access(user.email)
+        except Exception as e:
+            raise LookupError(msg, e)
 
-    def verbose(self, msg):
-        if self.verbose_messages:
-            self.log(msg)
-
-    def log(self, msg):
-        self.issues_log.append(msg)
-
-    def err(self, msg, e):
-        self.issues_log.append(f"Error: {msg} -- {format_exception(e)}")
-
+    def revoke_cloud(self, user, msg=None):
+        if msg is None:
+            msg = f"Can't revoke cloud access for user '{user}'"
+        try:
+            self.ego_client.revoke_cloud(user.email)
+        except Exception as e:
+            raise LookupError(msg, e)

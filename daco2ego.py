@@ -5,6 +5,8 @@ import sys
 from aes import decrypt_file
 from ego_client import EgoClient
 from requests import Session
+from user import User
+from format_errors import err_msg
 import csv
 
 from daco_client import DacoClient
@@ -14,10 +16,34 @@ def read_config(name="config/default.conf"):
          conf = json.load(f)
     return conf
 
-def users(data):
+def dictionaryFromCSV(data):
     text = data.decode()
     csvreader = csv.DictReader(text.splitlines())
-    return OrderedDict([ (u['openid'], u['user name']) for u in csvreader])
+    return [(u['openid'], u['user name']) for u in csvreader]
+
+def users_with_access_to(data):
+    return {u[0] for u in data}
+
+def is_member(members, candidate):
+    return candidate in members
+
+def daco_users(daco, cloud_members):
+    return [User(email,name,True, is_member(cloud_members, email))
+                for email,name in daco]
+
+def invalid_users(cloud, daco_members):
+    return [User(email, name, False, True)
+            for email,name in cloud
+            if not is_member(daco_members, email) ]
+
+def get_users(daco, cloud):
+    cloud_members = users_with_access_to(cloud)
+    daco_members = users_with_access_to(daco)
+
+    d = daco_users(daco, cloud_members)
+    i = invalid_users(cloud, daco_members)
+
+    return d + i
 
 def send_report(issues):
     for issue in issues:
@@ -32,30 +58,41 @@ def init(args):
     key = config['aes']['key']
     iv  = config['aes']['iv']
 
-    daco_users = users(decrypt_file(config['daco_file'], key, iv))
-    cloud_users = users(decrypt_file(config['cloud_file'], key, iv))
     auth_token = config['client']['auth_token']
     base_url   = config['client']['base_url']
-    verbose_log = config['verbose']
 
     rest_client = Session()
     ego_client = EgoClient(base_url, auth_token, rest_client)
-    client = DacoClient(daco_users, cloud_users, ego_client,verbose=verbose_log)
+
+    daco = dictionaryFromCSV(decrypt_file(config['daco_file'], key, iv))
+    cloud = dictionaryFromCSV(decrypt_file(config['cloud_file'], key, iv))
+
+    users = get_users(daco, cloud)
+    client = DacoClient(users, ego_client)
 
     return client
 
-def main(_program_name, *args):
-    issues = []
+def scream(msg, e):
+    print(f"*** Failure to send report {msg} -- {e} ***")
+    print(f"Sending a more reliable report somewhere else???")
 
+def main(_program_name, *args):
     try:
         daco_client = init(args)
-    except Exception as e:
+    except IOError as e:
         # Scenario 5 (Start-up failed)
-        issues.append("Initialization error:" + str(e))
+        issues = ["Initialization error:" + str(e)]
     else:
         # Scenarios 1,2,3,4,6
-        issues = daco_client.update_ego()
-    send_report(issues)
+        try:
+            issues = daco_client.update_ego()
+        except Exception as e:
+            issues = [err_msg("Unknown error",e)]
+    
+    try:
+        send_report(issues)
+    except Exception as e:
+        scream("Can't send out report", e)
 
 if __name__ == "__main__":
    main(*sys.argv)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from collections import OrderedDict
-from daco_client import DacoClient, format_exception
+from daco_client import DacoClient 
+from format_errors import format_exception
 from mock_ego_client import (MockEgoSuccess, MockEgoException,
                              MockEgoFailure, ex_name)
 
@@ -48,7 +49,7 @@ def test_invalid():
 
 def test_valid_daco():
     d = DacoClient(daco, cloud, None)
-    valid = d.all_users
+    valid = d.daco_users
     assert valid == ['a@ca','b@ca','d@ca', 'e@ca', 'f@ca']
 
 def test_valid_cloud():
@@ -105,7 +106,7 @@ def test_user_fail():
 def test_get_ego_users():
     e = MockEgoSuccess(ego)
     d = DacoClient({}, {}, e)
-    users = d.get_ego_users()
+    users = d.fetch_ego_ids()
     assert users == ego.keys()
 
     assert e.get_calls() == {'get_daco_users': ['Called'] }
@@ -117,7 +118,7 @@ def test_get_ego_users():
 def test_get_ego_users_fail():
     e = MockEgoFailure(ego)
     d = DacoClient({}, {}, e)
-    users = d.get_ego_users()
+    users = d.fetch_ego_ids()
 
     assert users == {}
     assert e.get_calls() == {'get_daco_users': ['Called']}
@@ -329,7 +330,7 @@ def test_allowed1():
     d = DacoClient(daco, cloud, e)
     # user a is already set up correctly in ego
     user='a@ca'
-    d.handle_access_allowed(user)
+    d.grant_access_if_necessary(user)
 
     assert e.get_calls() == { 'user_exists': [user],
                               'has_daco': [user]
@@ -342,7 +343,7 @@ def test_allowed2():
     d = DacoClient(daco, cloud, e)
     user='b@ca'
     # user b is already in Ego. He should have access to DACO and to Cloud
-    d.handle_access_allowed(user)
+    d.grant_access_if_necessary(user)
     assert e.get_calls() == {'user_exists': [user],
                              'has_daco': [user],
                              'has_cloud': [user]
@@ -358,10 +359,8 @@ def test_allowed3():
     d = DacoClient(daco, cloud, e)
     # user f is not in Ego. He should have access to DACO, and cloud.
     user='f@ca'
-    d.handle_access_allowed(user)
+    d.grant_access_if_necessary(user)
     assert e.get_calls() == {'user_exists': [user],
-                             'has_daco': [user],
-                             'has_cloud': [user],
                              'create_user': [(user, daco[user])],
                              'grant_daco': [user],
                              'grant_cloud': [user]
@@ -380,7 +379,7 @@ def test_denied1():
     # user 'b' is in Ego, and should still keep EGO and Cloud
     user='b@ca'
     # We shouldn't change or log anything
-    d.handle_access_denied(user)
+    d.revoke_access_if_necessary(user)
 
     assert e.get_calls() == {}
 
@@ -392,7 +391,7 @@ def test_denied2():
     d = DacoClient(daco, cloud, e)
     user='g@ca'
     # User g' should no longer have DACO or cloud.
-    d.handle_access_denied(user)
+    d.revoke_access_if_necessary(user)
     assert e.get_calls() == { 'has_daco':[user],
                               'revoke_access': [user] }
 
@@ -410,7 +409,7 @@ def test_denied3():
     # We should check to see if he has cloud (he doesn't).
 
     # We don't need to revoke his access, so nothing should be in the log.
-    d.handle_access_denied(user)
+    d.revoke_access_if_necessary(user)
 
     assert e.get_calls() == { 'has_cloud': [user]}
     # ensure we logged the revoked access

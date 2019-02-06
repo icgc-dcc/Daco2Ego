@@ -1,7 +1,7 @@
 #!/bin/sh
 
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_192.jdk/Contents/Home/
-kill `ps ax | grep ego | grep java | cut -d " " -f1`
+kill `ps ax | grep ego | grep java | cut -d " " -f1,2`
 
 psql <<"EOT"
 drop database ego; create database ego;
@@ -13,7 +13,7 @@ cd ~/projects/overture-stack/ego
 cd $here
 
 psql ego <<"EOT" 
-insert into egoapplication (name,clientid,clientsecret,status,type) values ('daco2ego','daco2ego','daco','Approved','ADMIN');
+insert into egoapplication (name,clientid,clientsecret,status,applicationtype) values ('daco2ego','daco2ego','daco','Approved','ADMIN');
 insert into egogroup (name, status) values ('daco_access','Approved');
 insert into egogroup (name, status) values ('daco_cloud','Approved');
 insert into policy (id,owner,name) select uuid_generate_v4(),G.id,'portal' from egogroup G where G.name='daco_access';

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from daco2ego import read_config, users 
+from daco2ego import read_config, get_users
 
 def test_read_config():
     expected= {
@@ -19,5 +19,5 @@ def test_users():
     with open("test_data","rb") as f:
          data = f.read()
     assert data is not None 
-    actual = users(data) 
+    actual = get_users(data)
     assert actual == expected

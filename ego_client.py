@@ -127,7 +127,7 @@ class EgoClient(object):
         return {u['email'].lower() for u in r['resultSet']}
 
     def create_user(self, user, name, ego_type="USER"):
-        j = json.dumps({"email": user, "name":name, "type": ego_type,
+        j = json.dumps({"email": user, "name":name, "userType": ego_type,
                        "status": "Approved" })
         reply=self._post("/users", j)
         r = json.loads(reply)
@@ -202,7 +202,7 @@ class EgoClient(object):
 
     def _set_id(self, user, id):
         m = self._get_user_map()
-        m[user] = id
+        m[user.lower()] = id
 
     def _get_user_map(self):
         if self._user_map is None:
