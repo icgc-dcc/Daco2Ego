@@ -132,6 +132,8 @@ class EgoClient(object):
         reply=self._post("/users", j)
         r = json.loads(reply)
         self._set_id(r['name'],r['id'])
+        if not self.user_exists(user):
+            self._ego_users.add(user)
         return r
 
     def has_policies(self,user, policies):
@@ -145,7 +147,6 @@ class EgoClient(object):
 
     def has_cloud(self, user):
         return self.has_policies(user, self.cloud_policies)
-
 
     def grant_daco(self, user):
         m = self._get_permission_map()
@@ -166,7 +167,7 @@ class EgoClient(object):
         user_id = self._user_id(user)
         self._grant_user_permission(user_id, policy_id, 'READ')
 
-    def revoke_access(self, user):
+    def revoke_daco(self, user):
         return self.revoke_policies(user, self.all_policies)
 
     def revoke_cloud(self, user):

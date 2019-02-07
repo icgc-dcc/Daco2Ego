@@ -4,10 +4,10 @@ from aes import decrypt_file
 def test_decrypt_file():
     key = "a1a2a3a4a5a6a7a8a9aa"
     iv  = "b1b2b3b4b5b6b7b8b9bb"
-    file = "test_data.enc.gz"
+    file = "tests/daco.csv.enc.gz"
     plaintext = decrypt_file(file, key, iv)
     expected = None
-    with open("test_data","rb") as f:
+    with open("tests/daco.csv","rb") as f:
          expected = f.read()
     assert expected is not None
     #print(f"plaintext='{plaintext}'")

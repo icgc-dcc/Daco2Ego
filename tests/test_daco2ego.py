@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from daco2ego import read_config, get_users
+from daco2ego import read_config, get_users, csv_to_dict
+from user import User
 
 def test_read_config():
     expected= {
@@ -8,16 +9,25 @@ def test_read_config():
         "daco_file":  "config/daco.csv",
         "cloud_file": "config/cloud.csv"
     }
-    config=read_config("test.conf")
+    config=read_config("tests/test.conf")
     assert config == expected
 
+def file_to_dict(name):
+    with open("tests/" + name,"rb") as f:
+         return csv_to_dict(f.read())
+
 def test_users():
-    expected = {'a.person@gmail.com': 'A Person',
-                'a.random.guy.random@gmail.com': 'SOME RANDOM GUY',
-                'wonderful@gmail.com': '&Aacute; wo&ntilde;derful user'
-                }
-    with open("test_data","rb") as f:
-         data = f.read()
-    assert data is not None 
-    actual = get_users(data)
-    assert actual == expected
+    expected = [
+        User('wonderful@gmail.com', '&Aacute; wo&ntilde;derful user',
+            True, False),
+        User('a.random.guy.random@gmail.com', 'SOME RANDOM GUY',
+              True, True),
+        User('a.person@gmail.com', 'A Person', True, False),
+        User('cloud_only@gmail.com', 'Cloudy Future',False, True)]
+
+
+    daco = file_to_dict("daco.csv")
+    cloud = file_to_dict("cloud.csv")
+    users = get_users(daco, cloud)
+    print(users)
+    assert users == expected

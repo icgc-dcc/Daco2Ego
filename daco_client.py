@@ -42,15 +42,18 @@ class DacoClient(object):
 
     def revoke(self):
         try:
-            ego_id_list = self.ego_client.get_daco_users()
+            users = self.get_daco_users_from_ego()
         except Exception as e:
             return err_msg("Can't get list of daco_users from ego",e)
-        return self.revoke_users(self.get_ego_users(ego_id_list))
+        return self.revoke_users(users)
+
+    def get_daco_users_from_ego(self):
+        return self.get_ego_users(self.ego_client.get_daco_users())
 
     def get_ego_users(self, ego_id_list):
-       return map(self.get_ego_user, ego_id_list)
+       return map(self.get_user, ego_id_list)
 
-    def get_ego_user(self, ego_id):
+    def get_user(self, ego_id):
         try:
             return self._user_map[ego_id]
         except KeyError:
@@ -66,6 +69,10 @@ class DacoClient(object):
             return err_msg(e.args[0],e.args[1])
 
     def grant_access_if_necessary(self, user):
+        if not self.is_unique_user(user):
+           return f"Error: User '{user}' has multiple entries in the daco " \
+                  f"file!"
+
         if user.invalid_email():
             return (f"Error: User '{user}' does not have a valid email "
                      f"address")
@@ -110,25 +117,31 @@ class DacoClient(object):
             #return f"Existing user '{user}' was set up correctly."
             return None
 
+    def is_unique_user(self, user):
+        u1 = self.get_user(user.email)
+        return u1 == user
+
     # scenarios 3 and 4
     def revoke_access_if_necessary(self, user):
         if user.is_invalid():
-            self.revoke_access(user)
-            return f"Revoked all access for invalid user '{user}':( on" \
-                   f"cloud access list, but not DACO"
+            self.revoke_daco(user)
+            return f"Revoked all access for invalid user '{user}':(on " \
+                   f"cloud access list, but not DACO)"
 
         if not user.has_daco:
-            self.revoke_access(user)
+            self.revoke_daco(user)
             return f"Revoked all access for user '{user}'"
 
         if not user.has_cloud:
-           if self.ego_client.has_cloud(user):
+           if self.has_cloud(user):
                self.revoke_cloud(user)
                return f"Revoked cloud access for user '{user}'"
         return None
 
-    # Wrap all calls to our ego_client LookupErrors with nice messages
-    # for us to display if they happen.
+    #####################################################################
+    # Wrap all exceptions from our ego_client as LookupErrors
+    # with nice context based messages for us to display if they happen.
+    ####################################################################
     def fetch_ego_ids(self, msg=None):
         """ Get all users from ego with daco related policies
         """
@@ -186,11 +199,11 @@ class DacoClient(object):
         except Exception as e:
            raise LookupError(msg, e)
 
-    def revoke_access(self, user, msg=None):
+    def revoke_daco(self, user, msg=None):
         if msg is None:
             msg = f"Can't revoke daco access for user '{user}'"
         try:
-            self.ego_client.revoke_access(user.email)
+            self.ego_client.revoke_daco(user.email)
         except Exception as e:
             raise LookupError(msg, e)
 

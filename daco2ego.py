@@ -16,7 +16,7 @@ def read_config(name="config/default.conf"):
          conf = json.load(f)
     return conf
 
-def dictionaryFromCSV(data):
+def csv_to_dict(data):
     text = data.decode()
     csvreader = csv.DictReader(text.splitlines())
     return [(u['openid'], u['user name']) for u in csvreader]
@@ -28,13 +28,13 @@ def is_member(members, candidate):
     return candidate in members
 
 def daco_users(daco, cloud_members):
-    return [User(email,name,True, is_member(cloud_members, email))
+    return [User(email,name,True, email in cloud_members)
                 for email,name in daco]
 
 def invalid_users(cloud, daco_members):
     return [User(email, name, False, True)
             for email,name in cloud
-            if not is_member(daco_members, email) ]
+            if not email in daco_members ]
 
 def get_users(daco, cloud):
     cloud_members = users_with_access_to(cloud)
@@ -64,8 +64,8 @@ def init(args):
     rest_client = Session()
     ego_client = EgoClient(base_url, auth_token, rest_client)
 
-    daco = dictionaryFromCSV(decrypt_file(config['daco_file'], key, iv))
-    cloud = dictionaryFromCSV(decrypt_file(config['cloud_file'], key, iv))
+    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
+    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
 
     users = get_users(daco, cloud)
     client = DacoClient(users, ego_client)

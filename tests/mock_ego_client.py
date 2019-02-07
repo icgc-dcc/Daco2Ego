@@ -43,9 +43,9 @@ class MockEgoSuccess(MockIO):
         self._daco_users[user]=(True, cloud)
         self.log_call('grant_daco', user)
 
-    def revoke_access(self, user):
+    def revoke_daco(self, user):
         self._daco_users[user]=(False, False)
-        self.log_call('revoke_access', user)
+        self.log_call('revoke_daco', user)
 
     def has_cloud(self, user):
         self.log_call('has_cloud', user)
