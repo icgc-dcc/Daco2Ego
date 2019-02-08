@@ -1,19 +1,21 @@
 import json
 class EgoClient(object):
-    daco_policies = {'portal'}
-    cloud_policies = {'aws', 'collab'}
-    all_policies = daco_policies | cloud_policies
-
-    def __init__(self, base_url, auth, rest_client):
+    def __init__(self, base_url, auth, daco_policies,
+                 cloud_policies, rest_client):
         self.auth = auth
         self.base_url = base_url
+        self.daco_policies = daco_policies  # set of policy name strings
+        self.cloud_policies = cloud_policies  # set of policy name strings
+
+        self._rest_client = rest_client
+        self._rest_client.stream = False
 
         self._policy_map=None       # dict of { policy_name : policy_id }
         self._permission_map=None   # dict of { policy_name: set( user_name) }
         self._user_map=None         # dict of { user_name: user_id }
         self._ego_users=None        # set( user_name )
-        self._rest_client = rest_client
-        self._rest_client.stream = False
+
+        self.all_policies = daco_policies | cloud_policies
 
     def _get(self, endpoint):
         # append header 'Authorization:' <our authorization token>

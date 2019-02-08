@@ -60,9 +60,12 @@ def init(args):
 
     auth_token = config['client']['auth_token']
     base_url   = config['client']['base_url']
+    daco_policies = set(config['client']['daco_policies'])
+    cloud_policies = set(config['client']['cloud_policies'])
 
     rest_client = Session()
-    ego_client = EgoClient(base_url, auth_token, rest_client)
+    ego_client = EgoClient(base_url, auth_token, daco_policies,
+                           cloud_policies, rest_client)
 
     daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
     cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
