@@ -1,18 +1,22 @@
 from collections import OrderedDict
-methods=lambda cls: {k for k in dir(cls) if not k.startswith('_')}
+
+
+def methods(cls):
+    return {k for k in dir(cls) if not k.startswith('_')}
+
 
 class MockIO(object):
     def __init__(self, *args, **kwargs):
-        super(MockIO, self).__init__(*args, **kwargs)
-        self.call_log=OrderedDict()
+        self.call_log = OrderedDict()
 
     def get_calls(self):
         return self.call_log
 
     def log_call(self, key, value):
         if key not in self.call_log:
-            self.call_log[key]=[]
+            self.call_log[key] = []
         self.call_log[key].append(value)
+
 
 class MockEgoSuccess(MockIO):
     def __init__(self, users):
@@ -29,7 +33,7 @@ class MockEgoSuccess(MockIO):
 
     def create_user(self, user, name):
         self._daco_users[user] = (False, False)
-        self.log_call('create_user', (user,name))
+        self.log_call('create_user', (user, name))
 
     def has_daco(self, user):
         self.log_call('has_daco', user)
@@ -39,12 +43,12 @@ class MockEgoSuccess(MockIO):
             raise MockEgoException(f"User '{user}' does not exist in ego")
 
     def grant_daco(self, user):
-        cloud=self._daco_users[user][1]
-        self._daco_users[user]=(True, cloud)
+        cloud = self._daco_users[user][1]
+        self._daco_users[user] = (True, cloud)
         self.log_call('grant_daco', user)
 
     def revoke_daco(self, user):
-        self._daco_users[user]=(False, False)
+        self._daco_users[user] = (False, False)
         self.log_call('revoke_daco', user)
 
     def has_cloud(self, user):
@@ -59,16 +63,13 @@ class MockEgoSuccess(MockIO):
         self.log_call('grant_cloud', user)
 
     def revoke_cloud(self, user):
-        self._daco_users[user]=(True, False)
+        self._daco_users[user] = (True, False)
         self.log_call('revoke_cloud', user)
 
-def log_function(f):
-    def wrapper(self, *args, **kwargs):
-        f(self, *args, **kwargs)
-        self.log_call(f.__name__, args)
 
 class MockEgoException(Exception):
     pass
+
 
 def fmt_tuple(t):
     """
@@ -80,6 +81,7 @@ def fmt_tuple(t):
         return f"({t[0]})"
     return f"{t}"
 
+
 def ex_name(name, *args):
     """
     :param name: A method name
@@ -88,15 +90,19 @@ def ex_name(name, *args):
     """
     return f"{name}{fmt_tuple(args)}"
 
+
 def fail(f):
     def raise_mock(*args, **kwargs):
         f(*args, **kwargs)
-        s=ex_name(f.__name__,*args[1:])
+        s = ex_name(f.__name__, *args[1:])
         raise MockEgoException(s)
+
     return raise_mock
+
 
 class MockEgoFailure(MockEgoSuccess):
     pass
+
 
 # For all of the methods from MockEgoSuccess, run that method, then
 # throw an exception

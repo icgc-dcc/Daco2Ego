@@ -1,5 +1,7 @@
 from format_errors import err_msg
 from user import User
+
+
 class DacoClient(object):
     def __init__(self, users, ego_client):
         """
@@ -9,11 +11,11 @@ class DacoClient(object):
             An EgoClient object that applies the requested changes
             to the Ego server.
         """
-        self.ego_client=ego_client
+        self.ego_client = ego_client
         self.users = users
         # make a map of ego id == user.email to user, so that we can
         # find ego users with daco permissions.
-        self._user_map = { u.email:u for u in users }
+        self._user_map = {u.email: u for u in users}
 
     def update_ego(self):
         """ Handle scenarios 1-4 wiki specification at
@@ -44,14 +46,14 @@ class DacoClient(object):
         try:
             users = self.get_daco_users_from_ego()
         except Exception as e:
-            return err_msg("Can't get list of daco_users from ego",e)
+            return err_msg("Can't get list of daco_users from ego", e)
         return self.revoke_users(users)
 
     def get_daco_users_from_ego(self):
         return self.get_ego_users(self.ego_client.get_daco_users())
 
     def get_ego_users(self, ego_id_list):
-       return map(self.get_user, ego_id_list)
+        return map(self.get_user, ego_id_list)
 
     def get_user(self, ego_id):
         try:
@@ -66,16 +68,16 @@ class DacoClient(object):
         try:
             return self.revoke_access_if_necessary(user)
         except LookupError as e:
-            return err_msg(e.args[0],e.args[1])
+            return err_msg(e.args[0], e.args[1])
 
     def grant_access_if_necessary(self, user):
         if not self.is_unique_user(user):
-           return f"Error: User '{user}' has multiple entries in the daco " \
-                  f"file!"
+            return f"Error: User '{user}' has multiple entries in the daco " \
+                   f"file!"
 
         if user.invalid_email():
             return (f"Error: User '{user}' does not have a valid email "
-                     f"address")
+                    f"address")
 
         if user.is_invalid():
             return None
@@ -104,17 +106,17 @@ class DacoClient(object):
             granted_daco = True
 
         if user.has_cloud and not self.has_cloud(user):
-                self.grant_cloud(user)
-                granted_cloud = True
+            self.grant_cloud(user)
+            granted_cloud = True
 
         if granted_daco and granted_cloud:
             return f"Granted daco and cloud to existing user '{user}'"
         elif granted_daco:
-           return f"Granted daco to existing user '{user}'"
+            return f"Granted daco to existing user '{user}'"
         elif granted_cloud:
             return f"Granted cloud to existing user '{user}"
         else:
-            #return f"Existing user '{user}' was set up correctly."
+            # return f"Existing user '{user}' was set up correctly."
             return None
 
     def is_unique_user(self, user):
@@ -133,9 +135,9 @@ class DacoClient(object):
             return f"Revoked all access for user '{user}'"
 
         if not user.has_cloud:
-           if self.has_cloud(user):
-               self.revoke_cloud(user)
-               return f"Revoked cloud access for user '{user}'"
+            if self.has_cloud(user):
+                self.revoke_cloud(user)
+                return f"Revoked cloud access for user '{user}'"
         return None
 
     #####################################################################
@@ -189,7 +191,7 @@ class DacoClient(object):
         try:
             self.ego_client.grant_daco(user.email)
         except Exception as e:
-           raise LookupError(msg, e)
+            raise LookupError(msg, e)
 
     def grant_cloud(self, user, msg=None):
         if msg is None:
@@ -197,7 +199,7 @@ class DacoClient(object):
         try:
             self.ego_client.grant_cloud(user.email)
         except Exception as e:
-           raise LookupError(msg, e)
+            raise LookupError(msg, e)
 
     def revoke_daco(self, user, msg=None):
         if msg is None:

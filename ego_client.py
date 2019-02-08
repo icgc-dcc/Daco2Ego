@@ -1,4 +1,6 @@
 import json
+
+
 class EgoClient(object):
     def __init__(self, base_url, auth, daco_policies,
                  cloud_policies, rest_client):
@@ -10,22 +12,22 @@ class EgoClient(object):
         self._rest_client = rest_client
         self._rest_client.stream = False
 
-        self._policy_map=None       # dict of { policy_name : policy_id }
-        self._permission_map=None   # dict of { policy_name: set( user_name) }
-        self._user_map=None         # dict of { user_name: user_id }
-        self._ego_users=None        # set( user_name )
+        self._policy_map = None  # dict of { policy_name : policy_id }
+        self._permission_map = None  # dict of { policy_name: set( user_name) }
+        self._user_map = None  # dict of { user_name: user_id }
+        self._ego_users = None  # set( user_name )
 
         self.all_policies = daco_policies | cloud_policies
 
     def _get(self, endpoint):
         # append header 'Authorization:' <our authorization token>
         # return self.rest_client.get(headers, endpoint)
-        #print(f"Connecting to {endpoint}")
+        # print(f"Connecting to {endpoint}")
         headers = {'Authorization': self.auth}
-        r=self._rest_client.get(self.base_url + endpoint, headers=headers)
+        r = self._rest_client.get(self.base_url + endpoint, headers=headers)
         if r.ok:
             return r.text
-        raise IOError("Error trying to GET {r.url}",r)
+        raise IOError("Error trying to GET {r.url}", r)
 
     def _get_json(self, endpoint):
         result = self._get(endpoint)
@@ -35,19 +37,20 @@ class EgoClient(object):
     def _post(self, endpoint, data):
         # append header 'Authorization:' <our authorization token>
         # return self.rest_client(headers, endpoint)
-        #print(f"Posting to {endpoint}")
-        headers = {'Authorization': self.auth, 'Content-type':
-            'application/json'}
-        r=self._rest_client.post(self.base_url + endpoint, data=data,
-                                 headers=headers)
+        # print(f"Posting to {endpoint}")
+        headers = {'Authorization': self.auth,
+                   'Content-type':  'application/json'}
+        r = self._rest_client.post(self.base_url + endpoint, data=data,
+                                   headers=headers)
         if r.ok:
             return r.text
-        raise IOError(f"Error trying to POST to {endpoint}",r, data)
+        raise IOError(f"Error trying to POST to {endpoint}", r, data)
 
     def _delete(self, endpoint):
-        #print(f"Deleting from {endpoint}")
+        # print(f"Deleting from {endpoint}")
         headers = {'Authorization': self.auth}
-        return self._rest_client.delete(self.base_url + endpoint, headers=headers)
+        return self._rest_client.delete(self.base_url + endpoint,
+                                        headers=headers)
 
     def _field_search(self, endpoint, name, value):
         query = endpoint + f"?{name}={value}&limit=9999999"
@@ -57,8 +60,8 @@ class EgoClient(object):
                           result)
 
         # Return only exact matches from the field search
-        matches= [item for item in result['resultSet']
-                              if item[name] == value ]
+        matches = [item for item in result['resultSet']
+                   if item[name] == value]
         if not matches:
             raise IOError(f"Can't find {value} in results from endpoint "
                           f"{query}", result)
@@ -81,9 +84,9 @@ class EgoClient(object):
         :return:
         """
         policy_id = self._get_policy_id(permission_name)
-        users=self._get_json(f"/policies/{policy_id}/users")
+        users = self._get_json(f"/policies/{policy_id}/users")
         # This is actually the email, even though it says name
-        return { u['name'].lower() for u in users}
+        return {u['name'].lower() for u in users}
 
     def _get_user_permissions(self, user):
         m = self._get_permission_map()
@@ -91,7 +94,7 @@ class EgoClient(object):
 
     def _get_permission_map(self):
         if not self._permission_map:
-            self._permission_map=self._create_permission_map()
+            self._permission_map = self._create_permission_map()
         return self._permission_map
 
     def _create_permission_map(self):
@@ -104,13 +107,13 @@ class EgoClient(object):
         r = self._delete(f"/users/{user_id}/permissions/{permission_id}")
         if r.ok:
             return r
-        raise IOError("Can't delete {permission_id} for user_id {user_id}",r)
+        raise IOError("Can't delete {permission_id} for user_id {user_id}", r)
 
     def _grant_user_permission(self, user_id, policy_id, mask):
-        j = json.dumps([{ "mask": mask, "policyId": policy_id}])
+        j = json.dumps([{"mask": mask, "policyId": policy_id}])
         return self._post(f"/users/{user_id}/permissions", j)
 
-    ### Public api
+    # Public api
     def get_daco_users(self):
         m = self._get_permission_map()
 
@@ -125,20 +128,20 @@ class EgoClient(object):
         return user in self._ego_users
 
     def _get_ego_users(self):
-        r=self._get_json("/users?limit=9999999")
+        r = self._get_json("/users?limit=9999999")
         return {u['email'].lower() for u in r['resultSet']}
 
     def create_user(self, user, name, ego_type="USER"):
-        j = json.dumps({"email": user, "name":name, "userType": ego_type,
-                       "status": "Approved" })
-        reply=self._post("/users", j)
+        j = json.dumps({"email": user, "name": name, "userType": ego_type,
+                        "status": "Approved"})
+        reply = self._post("/users", j)
         r = json.loads(reply)
-        self._set_id(r['name'],r['id'])
+        self._set_id(r['name'], r['id'])
         if not self.user_exists(user):
             self._ego_users.add(user)
         return r
 
-    def has_policies(self,user, policies):
+    def has_policies(self, user, policies):
         m = self._get_permission_map()
         if all(map(lambda p: user in m[p], policies)):
             return True
@@ -163,7 +166,7 @@ class EgoClient(object):
                 self._grant_permissions(user, p)
 
     def _grant_permissions(self, user, policy):
-        #print(f"Granting permissions to {user} with names {policy}")
+        # print(f"Granting permissions to {user} with names {policy}")
 
         policy_id = self._get_policy_id(policy)
         user_id = self._user_id(user)
@@ -203,9 +206,9 @@ class EgoClient(object):
         m = self._get_user_map()
         return m[user.lower()]
 
-    def _set_id(self, user, id):
+    def _set_id(self, user, user_id):
         m = self._get_user_map()
-        m[user.lower()] = id
+        m[user.lower()] = user_id
 
     def _get_user_map(self):
         if self._user_map is None:
@@ -214,7 +217,7 @@ class EgoClient(object):
 
     def _create_user_map(self):
         users = self._get_json("/users?limit=999999")
-        return { u['name'].lower():u['id'] for u in users['resultSet'] }
+        return {u['name'].lower(): u['id'] for u in users['resultSet']}
 
     def _get_policy_id(self, name):
         m = self._get_policy_map()
