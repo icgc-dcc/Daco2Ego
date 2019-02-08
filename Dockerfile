@@ -8,4 +8,4 @@ RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
 EXPOSE 8081 
 VOLUME config config
-ENTRYPOINT ["bash"] 
+ENTRYPOINT ["./daco2ego.py"] 
