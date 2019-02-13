@@ -9,6 +9,8 @@ from ego_client import EgoClient
 from format_errors import err_msg
 from requests import Session
 from user import User
+from report import create as create_report
+from slack import Reporter as SlackReporter
 
 
 def read_config(name="config/default.conf"):
@@ -51,11 +53,9 @@ def get_users(daco, cloud):
 
     return d + i
 
-
 def send_report(issues):
     for issue in issues:
         print(issue)
-
 
 def init(args):
     if args:
@@ -79,9 +79,10 @@ def init(args):
     cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
 
     users = get_users(daco, cloud)
-    client = DacoClient(users, ego_client)
+    daco_client = DacoClient(users, ego_client)
+    slack_client = SlackReporter(config['slack']['url'])
 
-    return client
+    return daco_client, slack_client
 
 
 def scream(msg, e):
@@ -91,7 +92,7 @@ def scream(msg, e):
 
 def main(_program_name, *args):
     try:
-        daco_client = init(args)
+        daco_client, slack_client = init(args)
     except IOError as e:
         # Scenario 5 (Start-up failed)
         issues = ["Initialization error:" + str(e)]
@@ -99,11 +100,15 @@ def main(_program_name, *args):
         # Scenarios 1,2,3,4,6
         try:
             issues = daco_client.update_ego()
+            counts, errors = daco_client.get_summary()
         except Exception as e:
             issues = [err_msg("Unknown error", e)]
 
     try:
         send_report(issues)
+        #counts, errors = summary(issues)
+        report=create_report(counts, errors)
+        slack_client.send(report)
     except Exception as e:
         scream("Can't send out report", e)
 
