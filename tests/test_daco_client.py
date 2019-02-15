@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from daco_client import DacoClient
 from user import User
-from mock_ego_client import MockEgoFailure, MockEgoSuccess
+from tests.mock_ego_client import MockEgoFailure, MockEgoSuccess
 
 user_list = [('a@ca', 'Person A', True, False),
              ('aa@ca', 'Person A', True, True),  # same name as A (ignored)
