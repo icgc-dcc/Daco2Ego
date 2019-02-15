@@ -1,0 +1,5 @@
+user name,openid,email,csa
+Cloudy Future,cloud_only@gmail.com, this field doesn't matter, false
+SOME RANDOM GUY,a.random.guy.random@gmail.com,rnd@uwaterloo.ca,true
+Cloudy Day,clouds@ca,invalid unused email field, false
+cloudsy,Squirrels are Cute!!!!,wrong_email@here.ca, true

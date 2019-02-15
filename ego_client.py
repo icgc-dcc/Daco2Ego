@@ -137,7 +137,8 @@ class EgoClient(object):
         return {u['email'].lower() for u in r['resultSet']}
 
     def create_user(self, user, name, ego_type="USER"):
-        j = json.dumps({"email": user, "name": name, "userType": ego_type,
+        first,_,last = name.rpartition(" ")
+        j = json.dumps({"email": user, "firstName": first, "lastName":last, "userType": ego_type,
                         "status": "Approved"})
         reply = self._post("/users", j)
         r = json.loads(reply)
@@ -166,7 +167,7 @@ class EgoClient(object):
 
     def grant_cloud(self, user):
         m = self._get_permission_map()
-        for p in self.all_policies:
+        for p in self.cloud_policies:
             if user not in m[p]:
                 self._grant_permissions(user, p)
 

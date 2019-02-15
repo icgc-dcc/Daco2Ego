@@ -80,7 +80,7 @@ def init(config):
 
 
 def scream(msg, e):
-    print(f"*** Failure to send report {msg} -- {repr(e)} ***")
+    print(f"*** Failed to send report: {err_msg(msg,e)} ***")
     print(f"Sending a more reliable report somewhere else???")
 
 def main(_program_name, *args):
@@ -89,9 +89,12 @@ def main(_program_name, *args):
             config = read_config(args[0])
         else:
             config = read_config()
+    except FileNotFoundError as f:
+        scream(f"Can't read configuration file '{f.filename}'",f)
+        exit(2) # ENOENT (No such file or directory)
     except Exception as e:
         scream("Can't get configuration for daco2ego!", e)
-        exit(2) # ENOENT (No such file or directory)
+        exit(2)
 
     try:
         slack_client = SlackReporter(config['slack']['url'])

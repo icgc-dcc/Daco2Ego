@@ -1,0 +1,4 @@
+user name,openid,email,csa
+A Person,a.person@gmail.com,me@some.host.edu,true
+A new person,new@gmail.com,somwhere@edu,true
+Invalid,no@gmail.com,x@y.com,true
