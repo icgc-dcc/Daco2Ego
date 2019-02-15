@@ -1,5 +1,10 @@
 #!/bin/bash
-docker build . -t go
-now=`date`
-out=daco2ego.report.${now}
-docker run --network=host -v "`pwd`/config:/daco2ego/config:ro" -it go > "${out}" 
+LOG_DIR="./logs"
+IMAGE="daco2ego"
+
+docker images | grep -q "$IMAGE" || docker build . -t $IMAGE
+now=`date +"%Y-%m-%d %H:%M:%S"`
+test -d $LOG_DIR || mkdir -p $LOG_DIR 
+OUT=$LOG_DIR/daco2ego.${now}.log
+
+docker run --network=host -v "`pwd`/config:/daco2ego/config:ro" -it $IMAGE > "${OUT}" 

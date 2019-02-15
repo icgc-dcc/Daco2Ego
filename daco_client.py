@@ -38,8 +38,9 @@ class DacoClient(object):
             self._counts[category] = [1, err]
 
     def get_summary(self):
-        return ({k:v[0] for k,v in self._counts.items() if not v[1]},
-                 [ f"{v[0]} ego errors during {k} operations" for k,v in self._counts.items() if v[1]])
+        counts = {k:v[0] for k,v in self._counts.items() if not v[1]}
+        errors = [ f"*Error:* Ego operation *{k}* failed for {v[0]} users" for k,v in self._counts.items() if v[1]]
+        return counts, errors
 
     def grant(self):
         return self.grant_users(self.users)
@@ -73,7 +74,7 @@ class DacoClient(object):
             return User(ego_id, None, False, False)
 
     def revoke_users(self, users):
-        return filter(None, map(self.revoke_access_if_necessary, users))
+        return filter(None, map(self.revoke_user, users))
 
     def revoke_user(self, user):
         try:
@@ -93,7 +94,8 @@ class DacoClient(object):
                     f"address")
 
         if user.is_invalid():
-            return None
+            self.count('invalid')
+            return f"Warning: User '{user}' is invalid (in cloud file, but not in DACO)"
 
         if self.ego_client.user_exists(user.email):
             return self.existing_user(user)
@@ -105,9 +107,11 @@ class DacoClient(object):
         self.grant_daco(user)
 
         if not user.has_cloud:
+            self.count('new_daco')
             return f"Created user '{user}' with daco access"
 
         self.grant_cloud(user)
+        self.count('new_cloud')
         return f"Created user '{user}' with cloud access"
 
     # scenario 2
@@ -123,10 +127,13 @@ class DacoClient(object):
             granted_cloud = True
 
         if granted_daco and granted_cloud:
+            self.count('grant_both')
             return f"Granted daco and cloud to existing user '{user}'"
         elif granted_daco:
+            self.count('grant_daco')
             return f"Granted daco to existing user '{user}'"
         elif granted_cloud:
+            self.count('grant_cloud')
             return f"Granted cloud to existing user '{user}"
         else:
             # return f"Existing user '{user}' was set up correctly."
@@ -140,15 +147,18 @@ class DacoClient(object):
     def revoke_access_if_necessary(self, user):
         if user.is_invalid():
             self.revoke_daco(user)
+            self.count('revoke_invalid')
             return f"Revoked all access for invalid user '{user}':(on " \
                    f"cloud access list, but not DACO)"
 
-        if not user.has_daco:
+        if not user.has_daco and self.has_daco(user):
             self.revoke_daco(user)
+            self.count('revoke_daco')
             return f"Revoked all access for user '{user}'"
 
         if not user.has_cloud:
             if self.has_cloud(user):
+                self.count('revoke_cloud')
                 self.revoke_cloud(user)
                 return f"Revoked cloud access for user '{user}'"
         return None
@@ -171,7 +181,7 @@ class DacoClient(object):
         try:
             return self.ego_client.user_exists(user.email)
         except Exception as e:
-            self.count('user_checks', err=True)
+            self.count('user exists check', err=True)
             raise LookupError(f"Can't tell if user '{user} is already in "
                               f"ego", e)
 
@@ -181,7 +191,7 @@ class DacoClient(object):
         try:
             self.ego_client.create_user(user.email, user.name)
         except Exception as e:
-            self.count('create_user', err=True)
+            self.count('create user', err=True)
             raise LookupError(msg, e)
 
     def has_daco(self, user, msg=None):
@@ -190,7 +200,7 @@ class DacoClient(object):
         try:
             return self.ego_client.has_daco(user.email)
         except Exception as e:
-            self.count("permissions_checks", err=True)
+            self.count("has DACO permission check", err=True)
             raise LookupError(msg, e)
 
     def has_cloud(self, user, msg=None):
@@ -199,7 +209,7 @@ class DacoClient(object):
         try:
             return self.ego_client.has_cloud(user.email)
         except Exception as e:
-            self.count("permissions_checks", err=True)
+            self.count("has cloud access check", err=True)
             raise LookupError(msg, e)
 
     def grant_daco(self, user, msg=None):
@@ -208,7 +218,7 @@ class DacoClient(object):
         try:
             self.ego_client.grant_daco(user.email)
         except Exception as e:
-            self.count("grant", err=True)
+            self.count("grant DACO access", err=True)
             raise LookupError(msg, e)
 
     def grant_cloud(self, user, msg=None):
@@ -217,7 +227,7 @@ class DacoClient(object):
         try:
             self.ego_client.grant_cloud(user.email)
         except Exception as e:
-            self.count("grant", err=True)
+            self.count("grant cloud access", err=True)
             raise LookupError(msg, e)
 
     def revoke_daco(self, user, msg=None):
@@ -226,7 +236,7 @@ class DacoClient(object):
         try:
             self.ego_client.revoke_daco(user.email)
         except Exception as e:
-            self.count("revoke", err=True)
+            self.count("revoke DACO access", err=True)
             raise LookupError(msg, e)
 
     def revoke_cloud(self, user, msg=None):
@@ -234,6 +244,6 @@ class DacoClient(object):
             msg = f"Can't revoke cloud access for user '{user}'"
         try:
             self.ego_client.revoke_cloud(user.email)
-            self.count("revoke", err=True)
         except Exception as e:
+            self.count("revoke cloud access", err=True)
             raise LookupError(msg, e)

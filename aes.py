@@ -18,6 +18,7 @@ def decrypt(data, key, iv):
         return bytes.fromhex(hex_str + "00" * padding)
 
     aes = AES.new(pad(key), aes_mode, pad(iv))
+
     return unpad(aes.decrypt(bytes(data)), aes_blocksize)
 
 
@@ -28,4 +29,7 @@ def read_gzip(name):
 
 
 def decrypt_file(aes_file, key, iv):
-    return decrypt(read_gzip(aes_file), key, iv)
+    try:
+        return decrypt(read_gzip(aes_file), key, iv)
+    except Exception as e:
+        raise RuntimeError(f"Unable to decrypt file {aes_file}", e)

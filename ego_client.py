@@ -88,6 +88,10 @@ class EgoClient(object):
         # This is actually the email, even though it says name
         return {u['name'].lower() for u in users}
 
+    def _has_permission(self, user, permission):
+        m = self._get_permission_map()
+        return user in m[permission]
+
     def _get_user_permissions(self, user):
         m = self._get_permission_map()
         return {p for p in self.all_policies if user in m[p]}
@@ -103,17 +107,18 @@ class EgoClient(object):
             m[p] = self._get_policy_users(p)
         return m
 
-    def _delete_user_permission(self, user_id, permission_id):
-        r = self._delete(f"/users/{user_id}/permissions/{permission_id}")
+    def _delete_user_permission(self, user_id, policy_id):
+        r = self._delete(f"/policies/{policy_id}/permission/user/{user_id}")
         if r.ok:
             return r
-        raise IOError("Can't delete {permission_id} for user_id {user_id}", r)
+        raise IOError(f"Can't revoke policy {policy_id}", r)
 
     def _grant_user_permission(self, user_id, policy_id, mask):
         j = json.dumps([{"mask": mask, "policyId": policy_id}])
         return self._post(f"/users/{user_id}/permissions", j)
 
     # Public api
+
     def get_daco_users(self):
         m = self._get_permission_map()
 
@@ -178,29 +183,15 @@ class EgoClient(object):
     def revoke_cloud(self, user):
         return self.revoke_policies(user, self.cloud_policies)
 
-    def revoke_policies(self, user, policies):
-        permissions = self._get_user_permissions(user)
-
-        for policy_name in policies:
-            for p in permissions:
-                if p['policy']['name'] == policy_name:
-                    permission_id = p['id']
-                    self._revoke_permission(user, permission_id)
-
-    def _revoke_permission(self, user, permission_id):
+    def revoke_policy(self, user, policy_name):
         user_id = self._user_id(user)
-        self._delete_user_permission(user_id, permission_id)
+        policy_id = self._get_policy_id(policy_name)
+        if self._has_permission(user, policy_name):
+            self._delete_user_permission(user_id, policy_id)
 
-    def _user_id_old(self, user):
-        """
-        Find the user's ego id based upon their email
-        :param user: The user's email address (as stored in ego)
-        :return: The user's ego id as a string (or an IOError is raised)
-        """
-        users = self._field_search("/users", "email", user)
-        if len(users) > 1:
-            raise IOError("Found multiple ids for user {user}", user)
-        return users[0]['id']
+    def revoke_policies(self, user, policies):
+        for policy_name in policies:
+            self.revoke_policy(user, policy_name)
 
     def _user_id(self, user):
         m = self._get_user_map()
