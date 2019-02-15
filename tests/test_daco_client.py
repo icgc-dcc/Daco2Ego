@@ -5,7 +5,6 @@ from daco_client import DacoClient
 from user import User
 from mock_ego_client import MockEgoFailure, MockEgoSuccess
 
-
 user_list = [('a@ca', 'Person A', True, False),
              ('aa@ca', 'Person A', True, True),  # same name as A (ignored)
              ('b@ca', 'Person B', True, True),  # duplicate B (report error)
@@ -256,7 +255,7 @@ def run_test_revoke(user, expected, calls):
 def test_revoke_access_if_necessary():
     def invalid(u):
         return f"Revoked all access for invalid user " \
-               f"'{u}':(on cloud access list, but not DACO)"
+            f"'{u}':(on cloud access list, but not DACO)"
 
     def daco(u):
         return f"Revoked all access for user '{u}'"
@@ -270,8 +269,8 @@ def test_revoke_access_if_necessary():
     data = [(users[4], invalid, {'revoke_daco'}),
             (users[8], ok, {}),
             (users[9], cloud, {'has_cloud', 'revoke_cloud'}),
-            (User('i@ca', None, False, False), daco, {'revoke_daco'}),
-            (User('j@ca', None, False, False), daco, {'revoke_daco'}),
+            (User('i@ca', None, False, False), daco, {'has_daco', 'revoke_daco'}),
+            (User('j@ca', None, False, False), daco, {'has_daco', 'revoke_daco'}),
             ]
     for user, f, call_names in data:
         e = [f'{user.email}']
@@ -305,15 +304,15 @@ def run_test_grant(user, expected, calls):
 
 def test_grant_access_if_necessary():
     def duplicate(u):
-        return f"Error: User '{u}' has multiple entries in the " \
-               f"daco file!"
+        return f"Warning: User '{u}' has multiple entries in the " \
+            f"daco file!"
 
     def invalid_email(u):
-        return f"Error: User '{u}' does not have a valid " \
-               f"email address"
+        return f"Warning: User '{u}' does not have a valid " \
+            f"email address"
 
-    def invalid_user(_u):
-        return None
+    def invalid_user(u):
+        return f"Warning: User '{u}' is invalid (in cloud file, but not in DACO)"
 
     def new_user(_u):
         return "new"
@@ -343,12 +342,13 @@ def test_update_ego():
 
     expected = ["Granted daco to existing user 'a@ca(Person A)'",
                 "Granted daco and cloud to existing user 'aa@ca(Person A)'",
-                "Error: User 'b@ca(Person B)' has multiple entries in the "
+                "Warning: User 'b@ca(Person B)' has multiple entries in the "
                 "daco file!",
                 "Granted cloud to existing user 'b@ca(Person Bee)",
+                "Warning: User 'c@ca(Person C)' is invalid (in cloud file, but not in DACO)",
                 "Created user 'd@ca(Person D)' with daco access",
                 "Created user 'e@ca(Person E)' with cloud access",
-                "Error: User 'http://k.ca/openid/letmein(Person K)' does not "
+                "Warning: User 'http://k.ca/openid/letmein(Person K)' does not "
                 "have a "
                 "valid email address",
                 "Revoked all access for invalid user 'c@ca(Person C)':(on "
@@ -365,7 +365,7 @@ def test_update_ego():
     assert e.get_calls() == OrderedDict([
         ('user_exists', ['a@ca', 'aa@ca', 'b@ca', 'd@ca', 'e@ca',
                          'f@ca', 'g@ca', 'h@ca']),
-        ('has_daco', ['a@ca', 'aa@ca', 'b@ca', 'f@ca', 'g@ca', 'h@ca']),
+        ('has_daco', ['a@ca', 'aa@ca', 'b@ca', 'f@ca', 'g@ca', 'h@ca', 'i@ca', 'j@ca']),
         ('grant_daco', ['a@ca', 'aa@ca', 'd@ca', 'e@ca']),
         ('has_cloud', ['aa@ca', 'b@ca', 'g@ca', 'a@ca', 'f@ca', 'h@ca',
                        'd@ca']),

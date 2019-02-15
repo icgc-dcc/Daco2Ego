@@ -33,13 +33,13 @@ class DacoClient(object):
 
     def count(self, category, err=False):
         try:
-            self._counts[category][0]+=1
+            self._counts[category][0] += 1
         except KeyError:
             self._counts[category] = [1, err]
 
     def get_summary(self):
-        counts = {k:v[0] for k,v in self._counts.items() if not v[1]}
-        errors = [ f"*Error:* Ego operation *{k}* failed for {v[0]} users" for k,v in self._counts.items() if v[1]]
+        counts = {k: v[0] for k, v in self._counts.items() if not v[1]}
+        errors = [f"*Error:* Ego operation *{k}* failed for {v[0]} users" for k, v in self._counts.items() if v[1]]
         return counts, errors
 
     def grant(self):
@@ -86,7 +86,7 @@ class DacoClient(object):
         if not self.is_unique_user(user):
             self.count("multiple_entries")
             return f"Warning: User '{user}' has multiple entries in the daco " \
-                   f"file!"
+                f"file!"
 
         if user.invalid_email():
             self.count("invalid_email")
@@ -95,7 +95,8 @@ class DacoClient(object):
 
         if user.is_invalid():
             self.count('invalid')
-            return f"Warning: User '{user}' is invalid (in cloud file, but not in DACO)"
+            return f"Warning: User '{user}' is invalid " \
+                f"(in cloud file, but not in DACO)"
 
         if self.ego_client.user_exists(user.email):
             return self.existing_user(user)
@@ -149,7 +150,7 @@ class DacoClient(object):
             self.revoke_daco(user)
             self.count('revoke_invalid')
             return f"Revoked all access for invalid user '{user}':(on " \
-                   f"cloud access list, but not DACO)"
+                f"cloud access list, but not DACO)"
 
         if not user.has_daco and self.has_daco(user):
             self.revoke_daco(user)
