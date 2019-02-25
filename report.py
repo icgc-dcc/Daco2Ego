@@ -11,14 +11,14 @@ def summarize(c):
 
     counts['new'] = counts['new_daco'] + counts['new_cloud']
     counts['grant'] = counts['grant_cloud'] + counts['grant_both']  # grants to cloud
-    counts['revoke'] = counts['revoke_cloud'] + counts['revoke_invalid']  # revokes of cloud
+    counts['revoke'] = counts['revoke_daco'] + counts['revoke_invalid']  # revokes of cloud
 
     updates = (('new', "Added {new} users({new_daco} with DACO access, {new_cloud} with DACO & Cloud)."),
                ('grant_daco', "Granted DACO access to {grant_daco} existing users."),
                ('grant',
                 "Granted DACO and Cloud access to {grant} existing users "
                 "({grant_cloud} of them already had DACO)."),
-               ('revoke_daco', "Revoked DACO access from {revoke_daco} existing users."),
+               ('revoke_cloud', "Revoked Cloud access from {revoke_cloud} existing users."),
                ('revoke',
                 "Revoked DACO and Cloud access from {revoke} existing users "
                 "({revoke_invalid} of them were invalid users).")
@@ -39,7 +39,7 @@ def summarize(c):
 
 
 def report_warnings(c):
-    fields = ("multiple_entries", "invalid", "invalid_email")
+    fields = ("multiple_entries", "invalid", "invalid_email","revoke_invalid")
     counts = zero_defaults(fields, c)
 
     if not (counts['multiple_entries'] or counts['invalid'] or counts['invalid_email']):
@@ -49,7 +49,8 @@ def report_warnings(c):
 
     warnings = (('multiple_entries', "{} multiple entries found in configuration file"),
                 ('invalid_email', "{} invalid OpenId email addresses found in configuration file"),
-                ('invalid', "{} invalid users found with Cloud access but not DACO access"))
+                ('invalid', '{}' + f" invalid users found with Cloud access but not DACO access "
+                f"({counts['revoke_invalid']} had access to revoke)"))
 
     for category, message in warnings:
         try:

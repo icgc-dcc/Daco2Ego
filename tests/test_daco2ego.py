@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from daco2ego import csv_to_dict, get_users, read_config
-from user import User
+from daco_user import User
 
 
 def test_read_config():

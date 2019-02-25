@@ -27,7 +27,7 @@ class EgoClient(object):
         r = self._rest_client.get(self.base_url + endpoint, headers=headers)
         if r.ok:
             return r.text
-        raise IOError("Error trying to GET {r.url}", r)
+        raise IOError(f"Error trying to GET {r.url}", r)
 
     def _get_json(self, endpoint):
         result = self._get(endpoint)
@@ -39,7 +39,7 @@ class EgoClient(object):
         # return self.rest_client(headers, endpoint)
         # print(f"Posting to {endpoint}")
         headers = {'Authorization': self.auth,
-                   'Content-type':  'application/json'}
+                   'Content-type': 'application/json'}
         r = self._rest_client.post(self.base_url + endpoint, data=data,
                                    headers=headers)
         if r.ok:
@@ -130,15 +130,15 @@ class EgoClient(object):
     def user_exists(self, user):
         if self._ego_users is None:
             self._ego_users = self._get_ego_users()
-        return user in self._ego_users
+        return user.lower() in self._ego_users
 
     def _get_ego_users(self):
         r = self._get_json("/users?limit=9999999")
         return {u['email'].lower() for u in r['resultSet']}
 
     def create_user(self, user, name, ego_type="USER"):
-        first,_,last = name.rpartition(" ")
-        j = json.dumps({"email": user, "firstName": first, "lastName":last, "userType": ego_type,
+        first, _, last = name.rpartition(" ")
+        j = json.dumps({"email": user, "firstName": first, "lastName": last, "userType": ego_type,
                         "status": "Approved"})
         reply = self._post("/users", j)
         r = json.loads(reply)
@@ -154,10 +154,10 @@ class EgoClient(object):
         return False
 
     def has_daco(self, user):
-        return self.has_policies(user, self.daco_policies)
+        return self.has_policies(user.lower(), self.daco_policies)
 
     def has_cloud(self, user):
-        return self.has_policies(user, self.cloud_policies)
+        return self.has_policies(user.lower(), self.cloud_policies)
 
     def grant_daco(self, user):
         m = self._get_permission_map()
@@ -172,14 +172,12 @@ class EgoClient(object):
                 self._grant_permissions(user, p)
 
     def _grant_permissions(self, user, policy):
-        # print(f"Granting permissions to {user} with names {policy}")
-
         policy_id = self._get_policy_id(policy)
         user_id = self._user_id(user)
         self._grant_user_permission(user_id, policy_id, 'READ')
 
     def revoke_daco(self, user):
-        return self.revoke_policies(user, self.all_policies)
+        return self.revoke_policies(user, self.daco_policies)
 
     def revoke_cloud(self, user):
         return self.revoke_policies(user, self.cloud_policies)

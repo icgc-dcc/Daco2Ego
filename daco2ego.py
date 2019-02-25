@@ -3,12 +3,13 @@ import csv
 import json
 import sys
 
+from requests import Session
+
 from aes import decrypt_file
 from daco_client import DacoClient
+from daco_user import User
 from ego_client import EgoClient
 from format_errors import err_msg
-from requests import Session
-from user import User
 from report import create as create_report
 from slack import Reporter as SlackReporter
 
@@ -53,9 +54,11 @@ def get_users(daco, cloud):
 
     return d + i
 
+
 def send_report(issues):
     for issue in issues:
         print(issue)
+
 
 def init(config):
     key = config['aes']['key']
@@ -80,8 +83,9 @@ def init(config):
 
 
 def scream(msg, e):
-    print(f"*** Failed to send report: {err_msg(msg,e)} ***")
+    print(f"*** Failed to send report: {err_msg(msg, e)} ***")
     print(f"Sending a more reliable report somewhere else???")
+
 
 def main(_program_name, *args):
     try:
@@ -90,8 +94,8 @@ def main(_program_name, *args):
         else:
             config = read_config()
     except FileNotFoundError as f:
-        scream(f"Can't read configuration file '{f.filename}'",f)
-        exit(2) # ENOENT (No such file or directory)
+        scream(f"Can't read configuration file '{f.filename}'", f)
+        exit(2)  # ENOENT (No such file or directory)
     except Exception as e:
         scream("Can't get configuration for daco2ego!", e)
         exit(2)
@@ -100,7 +104,7 @@ def main(_program_name, *args):
         slack_client = SlackReporter(config['slack']['url'])
     except Exception as e:
         scream("Can't get slack client to report errors!", e)
-        exit(6) # ENXIO (No such device or address)
+        exit(6)  # ENXIO (No such device or address)
 
     try:
         daco_client = init(config)
@@ -114,18 +118,19 @@ def main(_program_name, *args):
         try:
             issues = daco_client.update_ego()
             counts, errors = daco_client.get_summary()
-            ran=True
+            ran = True
         except Exception as e:
             issues = [err_msg("Run failed", e)]
             counts, errors = {}, issues
-            ran=False
+            ran = False
 
     try:
         send_report(issues)
-        report=create_report(counts, errors, ran)
+        report = create_report(counts, errors, ran)
         slack_client.send(report)
     except Exception as e:
         scream("Can't send out report", e)
+
 
 if __name__ == "__main__":
     main(*sys.argv)

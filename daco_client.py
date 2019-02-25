@@ -1,5 +1,5 @@
 from format_errors import err_msg
-from user import User
+from daco_user import User
 
 
 class DacoClient(object):
@@ -15,7 +15,7 @@ class DacoClient(object):
         self.users = users
         # make a map of ego id == user.email to user, so that we can
         # find ego users with daco permissions.
-        self._user_map = {u.email: u for u in users}
+        self._user_map = {u.email.lower(): u for u in users}
         self._counts = {}
 
     def update_ego(self):
@@ -69,7 +69,7 @@ class DacoClient(object):
 
     def get_user(self, ego_id):
         try:
-            return self._user_map[ego_id]
+            return self._user_map[ego_id.lower()]
         except KeyError:
             return User(ego_id, None, False, False)
 
@@ -100,6 +100,7 @@ class DacoClient(object):
 
         if self.ego_client.user_exists(user.email):
             return self.existing_user(user)
+
         return self.new_user(user)
 
     # scenario 1
@@ -152,7 +153,7 @@ class DacoClient(object):
             return f"Revoked all access for invalid user '{user}':(on " \
                 f"cloud access list, but not DACO)"
 
-        if not user.has_daco and self.has_daco(user):
+        if not user.has_daco:
             self.revoke_daco(user)
             self.count('revoke_daco')
             return f"Revoked all access for user '{user}'"
