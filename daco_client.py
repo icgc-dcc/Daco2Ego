@@ -58,7 +58,7 @@ class DacoClient(object):
         try:
             users = self.get_daco_users_from_ego()
         except Exception as e:
-            return err_msg("Can't get list of daco_users from ego", e)
+            return [err_msg("Can't get list of daco_users from ego", e)]
         return self.revoke_users(users)
 
     def get_daco_users_from_ego(self):

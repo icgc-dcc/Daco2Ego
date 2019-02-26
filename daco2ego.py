@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+
 import csv
 import json
 import sys
 
-from requests import Session
+from oauthlib.oauth2 import BackendApplicationClient
+from requests.auth import HTTPBasicAuth
+from requests_oauthlib import OAuth2Session
 
 from aes import decrypt_file
 from daco_client import DacoClient
@@ -60,17 +63,26 @@ def send_report(issues):
         print(issue)
 
 
+def get_oauth_authenticated_client(base_url, client_id, client_secret):
+    auth = HTTPBasicAuth(client_id, client_secret)
+    client = BackendApplicationClient(client_id=client_id)
+    oauth = OAuth2Session(client=client)
+    oauth.fetch_token(token_url=base_url + '/oauth/token', auth=auth)
+    return oauth
+
+
 def init(config):
     key = config['aes']['key']
     iv = config['aes']['iv']
 
-    auth_token = config['client']['auth_token']
+    client_id = config['client']['client_id']
+    client_secret = config['client']['client_secret']
     base_url = config['client']['base_url']
     daco_policies = set(config['client']['daco_policies'])
     cloud_policies = set(config['client']['cloud_policies'])
 
-    rest_client = Session()
-    ego_client = EgoClient(base_url, auth_token, daco_policies,
+    rest_client = get_oauth_authenticated_client(base_url, client_id, client_secret)
+    ego_client = EgoClient(base_url, daco_policies,
                            cloud_policies, rest_client)
 
     daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
@@ -108,9 +120,13 @@ def main(_program_name, *args):
 
     try:
         daco_client = init(config)
+    except KeyError as e:
+        issues = ["Daco2Ego configuration file error: missing entry for " + str(e) ]
+        counts, errors = {}, issues
+        ran = False
     except Exception as e:
         # Scenario 5 (Start-up failed)
-        issues = ["DACO client init error:" + str(e)]
+        issues = ["DACO client init error:" + str(type(e)) + '(' + str(e)+ ')']
         counts, errors = {}, issues
         ran = False
     else:

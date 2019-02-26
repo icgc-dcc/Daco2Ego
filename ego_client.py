@@ -2,9 +2,8 @@ import json
 
 
 class EgoClient(object):
-    def __init__(self, base_url, auth, daco_policies,
+    def __init__(self, base_url, daco_policies,
                  cloud_policies, rest_client):
-        self.auth = auth
         self.base_url = base_url
         self.daco_policies = daco_policies  # set of policy name strings
         self.cloud_policies = cloud_policies  # set of policy name strings
@@ -20,11 +19,7 @@ class EgoClient(object):
         self.all_policies = daco_policies | cloud_policies
 
     def _get(self, endpoint):
-        # append header 'Authorization:' <our authorization token>
-        # return self.rest_client.get(headers, endpoint)
-        # print(f"Connecting to {endpoint}")
-        headers = {'Authorization': self.auth}
-        r = self._rest_client.get(self.base_url + endpoint, headers=headers)
+        r = self._rest_client.get(self.base_url + endpoint)
         if r.ok:
             return r.text
         raise IOError(f"Error trying to GET {r.url}", r)
@@ -35,11 +30,7 @@ class EgoClient(object):
         return j
 
     def _post(self, endpoint, data):
-        # append header 'Authorization:' <our authorization token>
-        # return self.rest_client(headers, endpoint)
-        # print(f"Posting to {endpoint}")
-        headers = {'Authorization': self.auth,
-                   'Content-type': 'application/json'}
+        headers = {'Content-type': 'application/json'}
         r = self._rest_client.post(self.base_url + endpoint, data=data,
                                    headers=headers)
         if r.ok:
@@ -47,10 +38,7 @@ class EgoClient(object):
         raise IOError(f"Error trying to POST to {endpoint}", r, data)
 
     def _delete(self, endpoint):
-        # print(f"Deleting from {endpoint}")
-        headers = {'Authorization': self.auth}
-        return self._rest_client.delete(self.base_url + endpoint,
-                                        headers=headers)
+        return self._rest_client.delete(self.base_url + endpoint)
 
     def _field_search(self, endpoint, name, value):
         query = endpoint + f"?{name}={value}&limit=9999999"
