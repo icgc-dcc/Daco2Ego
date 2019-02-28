@@ -266,7 +266,7 @@ def test_revoke_access_if_necessary():
     def ok(_u):
         return None
 
-    data = [(users[4], invalid, {'revoke_daco'}),
+    data = [(users[4], invalid, {'revoke_daco','revoke_cloud'}),
             (users[8], ok, {}),
             (users[9], cloud, {'has_cloud', 'revoke_cloud'}),
             (User('i@ca', None, False, False), daco, {'has_daco', 'revoke_daco'}),
@@ -373,4 +373,4 @@ def test_update_ego():
         ('create_user', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
         ('get_daco_users', ['Called']),
         ('revoke_daco', ['c@ca', 'i@ca', 'j@ca']),
-        ('revoke_cloud', ['h@ca'])])
+        ('revoke_cloud', ['c@ca','h@ca'])])

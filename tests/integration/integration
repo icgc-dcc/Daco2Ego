@@ -38,7 +38,6 @@ step "Setting up ego with ($here/setup_ego)"
 $here/setup_ego
 
 step "Testing add & invalid user reporting"
-step "./daco2ego.py $config1"
 run $config1
 
 step "Testing adding only done once"

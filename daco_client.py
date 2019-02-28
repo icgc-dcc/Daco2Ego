@@ -149,13 +149,15 @@ class DacoClient(object):
     def revoke_access_if_necessary(self, user):
         if user.is_invalid():
             self.revoke_daco(user)
+            self.revoke_cloud(user)
             self.count('revoke_invalid')
             return f"Revoked all access for invalid user '{user}':(on " \
                 f"cloud access list, but not DACO)"
 
         if not user.has_daco:
-            self.revoke_daco(user)
-            self.count('revoke_daco')
+            if self.has_daco(user):
+                self.count('revoke_daco')
+                self.revoke_daco(user)
             return f"Revoked all access for user '{user}'"
 
         if not user.has_cloud:
