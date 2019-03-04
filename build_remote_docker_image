@@ -1,0 +1,7 @@
+#!/bin/sh
+IMAGE=${1:-daco2ego:latest}
+REMOTE=${2:-kevinhartmann/daco2ego:latest}
+docker rmi $IMAGE
+docker build -t $IMAGE .
+docker tag $IMAGE $REMOTE 
+docker push $REMOTE

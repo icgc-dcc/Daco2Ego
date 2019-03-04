@@ -1,6 +1,7 @@
 { "client": { 
     "base_url": "http://olm-khartmann.local:8081",
-    "auth_token": "Basic ZGFjbzJlZ286ZGFjbw==",
+    "client_id": "daco2ego",
+    "client_secret": "daco",
     "daco_policies": ["portal"],
     "cloud_policies": ["aws","collab"] 
      },
