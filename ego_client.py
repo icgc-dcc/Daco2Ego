@@ -152,12 +152,14 @@ class EgoClient(object):
         for p in self.daco_policies:
             if user not in m[p]:
                 self._grant_permissions(user, p)
+                m[p].add(user)
 
     def grant_cloud(self, user):
         m = self._get_permission_map()
         for p in self.cloud_policies:
             if user not in m[p]:
                 self._grant_permissions(user, p)
+                m[p].add(user)
 
     def _grant_permissions(self, user, policy):
         policy_id = self._get_policy_id(policy)
@@ -177,8 +179,10 @@ class EgoClient(object):
             self._delete_user_permission(user_id, policy_id)
 
     def revoke_policies(self, user, policies):
+        m = self._get_permission_map()
         for policy_name in policies:
             self.revoke_policy(user, policy_name)
+            m[policy_name].discard(user)
 
     def _user_id(self, user):
         m = self._get_user_map()
