@@ -1,0 +1,1 @@
+* * * * * LOG=logs; test -d $LOG || mkdir $LOG;docker run --network=host -v /home/daco2ego/daco2ego.conf:/daco2ego/config/default.conf:ro -v/nfs/icgc-dcc:/nfs/icgc-dcc/:ro kevinhartmann/daco2ego:latest > ${LOG}/report-$(date +"\%Y-\%m-\%d \%H:\%M:\%S")

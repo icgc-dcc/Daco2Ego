@@ -58,9 +58,12 @@ def get_users(daco, cloud):
     return d + i
 
 
-def send_report(issues):
+def send_report(issues, summary):
+    print(summary)
+    print("* Detailed Issues Log *")
     for issue in issues:
         print(issue)
+    print("* End of report *")
 
 
 def get_oauth_authenticated_client(base_url, client_id, client_secret):
@@ -141,9 +144,10 @@ def main(_program_name, *args):
             ran = False
 
     try:
-        send_report(issues)
-        report = create_report(counts, errors, ran)
-        slack_client.send(report)
+        summary = create_report(counts, errors, ran)
+        send_report(issues, summary)
+        slack_client.send(summary)
+
     except Exception as e:
         scream("Can't send out report", e)
 
