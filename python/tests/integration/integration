@@ -1,0 +1,53 @@
+#!/bin/bash
+. bash_colors.sh
+steps=0
+here=`dirname $0`
+cd $here
+
+config1="$here/add.conf.test"
+config2="$here/change.conf.test"
+
+step() {
+   steps=$(($steps+1))
+   echo "${Black}Step $steps:${NC} ${Red}$1${NC}" 
+}
+
+step Generating test data 
+for f in $here/*.csv;do
+    step "$here/encrypt.sh $f"
+    $here/encrypt.sh $f
+done
+
+step "Killing ego"
+ps ax | grep 'java' | grep ego | kill `cut -d' ' -f1,2`
+
+step "Activating python virtual environment"
+
+. $here/../../.venv/bin/activate
+ego=$here/../../daco2ego.py
+
+run() {
+  echo "${Green}Running $ego $1${NC}"
+  $ego $1 
+}
+
+step "Testing ego connect fail warning" 
+run $config1
+
+step "Setting up ego with ($here/setup_ego)"
+$here/setup_ego
+
+step "Testing add & invalid user reporting"
+run $config1
+
+step "Testing adding only done once"
+run $config1
+
+step "Testing change and remove reporting" 
+run "./daco2ego.py $config2"
+
+step "Testing change and remove reporting only done once"
+run $config2
+
+step "Testing change reporting done only once"
+run $config2

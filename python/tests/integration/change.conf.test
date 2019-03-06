@@ -1,0 +1,15 @@
+{ "client": { 
+    "base_url": "http://olm-khartmann.local:8081",
+    "auth_token": "Basic ZGFjbzJlZ286ZGFjbw==",
+    "daco_policies": ["portal"],
+    "cloud_policies": ["aws","collab"] 
+     },
+"aes": {
+     "key":"a1a2a3a4a5a6a7a8a9aa", "iv": "b1b2b3b4b5b6b7b8b9bb" 
+       },
+"slack":{
+    "url": "https://hooks.slack.com/services/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"
+},
+"daco_file":  "daco.change.csv.enc.gz",
+"cloud_file": "cloud.change.csv.enc.gz"
+}

@@ -1,0 +1,42 @@
+#!/bin/bash
+. bash_colors.sh
+steps=0
+here=`dirname $0`
+cd $here
+
+config1="$here/fuzz.conf.test"
+config2="$here/fuzz2.conf.test"
+
+step() {
+   steps=$(($steps+1))
+   echo "${Black}Step $steps:${NC} ${Red}$1${NC}" 
+}
+
+step "Activating python virtual environment"
+. $here/../../.venv/bin/activate
+ego=$here/../../daco2ego.py
+
+#step "Setting up ego with ($here/setup_ego)"
+#$here/setup_ego
+
+run() {
+  echo "${Green}Running $ego $1${NC}"
+  $ego $1 
+}
+
+function fuzz() {
+   step Generating test data 
+   $here/fuzz.py fuzz.daco.csv fuzz.cloud.csv > expected
+
+   for f in $here/fuzz.*.csv{,2};do
+       step "$here/encrypt.sh $f"
+       $here/encrypt.sh $f
+   done
+
+   run $config1 > report1
+   run $config2 > report2
+   run $config2 > report3
+   #$compare/compare.py report expected
+}
+
+fuzz

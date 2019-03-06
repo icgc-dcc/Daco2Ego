@@ -1,5 +1,0 @@
-#!/bin/bash
-docker build . -t go
-now=`date`
-out=daco2ego.report.${now}
-docker run --network=host -v "`pwd`/config:/daco2ego/config:ro" -it go > "${out}" 

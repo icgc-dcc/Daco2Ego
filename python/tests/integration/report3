@@ -1,0 +1,8 @@
+[32mRunning ./../../daco2ego.py ./fuzz2.conf.test(B[m
+*Daco2Ego Report Summary*
+
+Daco2Ego configuration file error: missing entry for 'client_id'
+
+* Detailed Issues Log *
+Daco2Ego configuration file error: missing entry for 'client_id'
+* End of report *

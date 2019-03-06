@@ -26,5 +26,11 @@ cd ~/projects/overture-stack/ego
 SPRING_PROFILES_ACTIVE=auth mvn spring-boot:run > $here/ego.log &
 #SPRING_PROFILES_ACTIVE=auth mvn spring-boot:run
 cd $here
-
-
+t=0
+timeout=30
+until grep "Started" $here/ego.log;do 
+   t=$(($t + 1))
+   echo "Waited $t seconds so far for ego to start..."
+   sleep 1
+   if [ "$t" -gt "$timeout" ]; then echo "Ego should have started within $timeout seconds... stopping";break;fi
+done

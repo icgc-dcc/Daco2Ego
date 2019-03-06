@@ -1,0 +1,8 @@
+user name,openid,email,csa
+&Aacute; wo&ntilde;derful user,wonderful@gmail.com,wonderuser@abc.eu,true
+SOME RANDOM GUY,a.random.guy.random@gmail.com,rnd@uwaterloo.ca,true
+A Person,a.person@gmail.com,me@some.host.edu,true
+Cloudy Day,clouds@ca,invalid unused email field, false
+cloudsy,Squirrels are Cute!!!!,wrong_email@here.ca, true
+Duplicate User,dup@gmail.com,dup@ca,true
+Duplicate of A User,dup@gmail.com,dup@ca, true
