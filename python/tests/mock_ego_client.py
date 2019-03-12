@@ -44,11 +44,13 @@ class MockEgoSuccess(MockIO):
         self.groups['users'] = user
 
     def add(self, group, users):
-        self.log_call('add', (group,users))
+        assert len(users) == 1
+        self.log_call('add', (group,users[0]))
         self.groups[group] += users
 
     def remove(self, group, users):
-        self.log_call('remove',(group, users))
+        assert len(users) == 1
+        self.log_call('remove',(group, users[0]))
         self.groups[group] += users
 
 

@@ -39,7 +39,7 @@ class EgoClient(object):
 
         # Return only exact matches from the field search
         matches = [item for item in result['resultSet']
-                   if item[name] == value]
+                   if item[name].lower() == value.lower()]
         if not matches:
             raise LookupError(f"Can't find {value} in results from endpoint "
                               f"{query}", result)
@@ -52,10 +52,16 @@ class EgoClient(object):
         :param group:
         :return:
         """
-        return self._field_search("/groups", "name", group)
+        group_ids = self._field_search("/groups", "name", group)
+        if len(group_ids) > 1:
+            raise LookupError(f"Multiple ids matched group '{group}': {group_ids}")
+        return group_ids[0]['id']
 
     def _user_id(self, user):
-        return self._field_search("/users", "email", user)
+        user_ids = self._field_search("/users", "email", user)
+        if len(user_ids) > 1:
+            raise LookupError(f"Multiple ids matched user '{user}': {user_ids}")
+        return user_ids[0]['id']
 
     def get_users(self, group):
         """
@@ -64,7 +70,10 @@ class EgoClient(object):
         :return:
         """
         group_id = self._group_id(group)
-        return self._get(f"/groups/{group_id}/users")
+        results = self._get_json(f"/groups/{group_id}/users?limit=9999999")
+
+        return { user['email'] for user in results['resultSet']}
+
 
     def is_member(self, user, group):
         """
@@ -73,13 +82,7 @@ class EgoClient(object):
         :param group:
         :return:
         """
-        try:
-            user_id = self._user_id(user)
-        except LookupError:
-            # If user is not in ego, they're not in the group
-            return False
-
-        return user_id in self.get_users(group)
+        return user in self.get_users(group)
 
     def user_exists(self, user):
         """
@@ -88,7 +91,7 @@ class EgoClient(object):
         :return:
         """
         try:
-            self._user_id(user.email)
+            self._user_id(user)
         except LookupError:
             return False
         return True
@@ -109,9 +112,10 @@ class EgoClient(object):
 
         :return:
         """
-        user_ids = map(self._user_id, users)
+        user_ids = list(map(self._user_id, users))
         group_id = self._group_id(group)
-        return self._post(f"/api/groups/{group_id}/users", user_ids)
+        j = json.dumps(user_ids)
+        return self._post(f"/api/groups/{group_id}/users", j)
 
     def remove(self, group, users):
         """

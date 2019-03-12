@@ -85,13 +85,13 @@ def run_user_test(user, method_name, call_results, exception_message):
 def run_io_tests():
     u = users[0]
     tests = {'create_user': ({'create_user': [(u.email, u.name)]}, f"Can't create user '{u}'"),
-             'revoke_daco': ({'remove': [('daco', [u.email])]},
+             'revoke_daco': ({'remove': [('daco', u.email)]},
                              f"Can't revoke daco access for user '{u}'"),
-             'revoke_cloud': ({'remove': [('cloud', [u.email])]},
+             'revoke_cloud': ({'remove': [('cloud', u.email)]},
                               f"Can't revoke cloud access for user '{u}'"),
-             'grant_daco': ({'add': [('daco', [u.email])]},
+             'grant_daco': ({'add': [('daco', u.email)]},
                             f"Can't grant daco access to user '{u}'"),
-             'grant_cloud': ({'add': [('cloud', [u.email])]},
+             'grant_cloud': ({'add': [('cloud', u.email)]},
                              f"Can't grant cloud access to user '{u}'"),
              }
     for k, v in tests.items():
@@ -198,13 +198,13 @@ def test_new_user():
     def daco(u):
         return (f"Created user '{u}' with daco access",
                 {'create_user': ([(u.email, u.name)]),
-                 'add': [('daco', [u.email])]
+                 'add': [('daco', u.email)]
                  })
 
     def cloud(u):
         return (f"Created user '{u}' with cloud access",
                 {'create_user': ([(u.email, u.name)]),
-                 'add': [('daco', [u.email]), ('cloud', [u.email])]
+                 'add': [('daco', u.email), ('cloud', u.email)]
                  }
                 )
 
@@ -239,15 +239,15 @@ def expected_grants(user, grant_daco, grant_cloud):
     e = f'{user.email}'
     if grant_daco and grant_cloud:
         return (f"Granted daco and cloud to existing user '{user}'",
-                {'add': [('daco', [e]), ('cloud', [e])],
+                {'add': [('daco', e), ('cloud', e)],
                  'is_member': [('daco', e), ('cloud', e)]})
     elif grant_daco:
         return (f"Granted daco to existing user '{user}'",
-                {'add': [('daco', [e])],
+                {'add': [('daco', e)],
                  'is_member': [('daco', e)]})
     elif grant_cloud:
         return (f"Granted cloud to existing user '{user}",
-                {'add': [('cloud', [e])],
+                {'add': [('cloud', e)],
                  'is_member': [('daco', e), ('cloud', e)]})
     else:
         # return f"Existing user '{user}' was set up correctly."
@@ -263,7 +263,7 @@ def run_test_revoke(user, expected, calls):
 
 def test_revoke_access_if_necessary():
     def e(u):
-        return [f'{u.email}']
+        return f'{u.email}'
 
     def invalid(u):
         return (f"Revoked all access for invalid user '{u}':(on cloud access list, but not DACO)",
@@ -271,11 +271,11 @@ def test_revoke_access_if_necessary():
 
     def daco(u):
         return (f"Revoked all access for user '{u}'",
-                {'is_member': [('daco', u.email)], 'remove': [('daco', e(u))]})
+                {'is_member': [('daco',e(u))], 'remove': [('daco', e(u))]})
 
     def cloud(u):
         return (f"Revoked cloud access for user '{u}'",
-                {'is_member': [('cloud', u.email)], 'remove': [('cloud', e(u))]})
+                {'is_member': [('cloud', e(u))], 'remove': [('cloud', e(u))]})
 
     def ok(_u):
         return None, {}
@@ -375,16 +375,30 @@ def test_update_ego():
 
     print(e.get_calls())
 
-    assert e.get_calls() == dict([
+    expected_calls = dict([
         ('user_exists', ['a@ca', 'aa@ca', 'b@ca', 'd@ca', 'e@ca',
                          'f@ca', 'g@ca', 'h@ca']),
         ('is_member', [('daco','a@ca'),('daco','aa@ca'),('cloud','aa@ca'),('daco','b@ca'),('cloud','b@ca'),
-                       ('daco','f@ca'),('daco','g@ca'),('cloud','g@ca'),('daco','h@ca'),('daco','i@ca'),
-                       ('cloud','i@ca'),('cloud','h@ca'),('daco','j@ca'),('cloud','a@ca'),('cloud','f@ca')]),
-        ('add', [('daco',['a@ca']),('daco',['aa@ca']),('cloud',['aa@ca']),('cloud',['b@ca']),('daco',['d@ca']),
-                ('daco',['e@ca']),('cloud',['e@ca'])]),
+                       ('cloud','d@ca'),('daco','f@ca'),('daco','g@ca'),('cloud','g@ca'),
+                       ('daco','h@ca'),('daco','i@ca'),('cloud','h@ca'),('daco','j@ca'),
+                       ('cloud','a@ca'),('cloud','f@ca')]),
+        ('add', [('daco','a@ca'),('daco','aa@ca'),('cloud','aa@ca'),('cloud','b@ca'),('daco','d@ca'),
+                ('daco','e@ca'),('cloud','e@ca')]),
         ('create_user', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
         ('get_users', ['daco','cloud']),
-        ('remove', [('daco',['i@ca']),('daco',['j@ca']),('cloud',['c@ca']),('cloud',['h@ca'])])
+        ('remove', [('daco','i@ca'),('daco','j@ca'),('daco','c@ca'),('cloud','c@ca'),('cloud','h@ca')])
        ])
+
+    actual_calls = e.get_calls()
+
+    for fn in expected_calls:
+        print(f"Checking calls for function {fn}")
+        a = actual_calls[fn]
+        e = expected_calls[fn]
+        if a == e:
+            assert a == e
+        else:
+
+            assert set(a) == set(e)
+        print("ok.")
 
