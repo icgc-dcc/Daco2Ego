@@ -72,8 +72,7 @@ class EgoClient(object):
         group_id = self._group_id(group)
         results = self._get_json(f"/groups/{group_id}/users?limit=9999999")
 
-        return { user['email'] for user in results['resultSet']}
-
+        return {user['email'] for user in results['resultSet']}
 
     def is_member(self, group, user):
         """

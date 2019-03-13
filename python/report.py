@@ -39,7 +39,7 @@ def summarize(c):
 
 
 def report_warnings(c):
-    fields = ("multiple_entries", "invalid", "invalid_email","revoke_invalid")
+    fields = ("multiple_entries", "invalid", "invalid_email", "revoke_invalid")
     counts = zero_defaults(fields, c)
 
     if not (counts['multiple_entries'] or counts['invalid'] or counts['invalid_email']):

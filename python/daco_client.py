@@ -3,7 +3,7 @@ from daco_user import User
 
 
 class DacoClient(object):
-    def __init__(self, daco_group, cloud_group,  users, ego_client):
+    def __init__(self, daco_group, cloud_group, users, ego_client):
         """
         :param users: A list of User objects
 
@@ -252,7 +252,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't revoke cloud access for user '{user}'"
         try:
-            self.ego_client.remove(self.cloud_group,[user.email])
+            self.ego_client.remove(self.cloud_group, [user.email])
         except Exception as e:
             self.count("revoke cloud access", err=True)
             raise LookupError(msg, e)
