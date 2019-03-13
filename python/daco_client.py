@@ -160,6 +160,7 @@ class DacoClient(object):
             if self.has_daco(user):
                 self.count('revoke_daco')
                 self.revoke_daco(user)
+                self.revoke_cloud(user)
             return f"Revoked all access for user '{user}'"
 
         if not user.has_cloud:
