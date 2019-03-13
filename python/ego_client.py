@@ -75,7 +75,7 @@ class EgoClient(object):
         return { user['email'] for user in results['resultSet']}
 
 
-    def is_member(self, user, group):
+    def is_member(self, group, user):
         """
         Returns true if the user is a member of the group
         :param user:
@@ -115,7 +115,7 @@ class EgoClient(object):
         user_ids = list(map(self._user_id, users))
         group_id = self._group_id(group)
         j = json.dumps(user_ids)
-        return self._post(f"/api/groups/{group_id}/users", j)
+        return self._post(f"/groups/{group_id}/users", j)
 
     def remove(self, group, users):
         """
@@ -124,6 +124,7 @@ class EgoClient(object):
         :param users:
         :return:
         """
-        user_ids = map(self._user_id, users)
+        user_ids = list(map(self._user_id, users))
         group_id = self._group_id(group)
-        self._post(f"/api/groups/{group_id}/users", user_ids)
+        j = ",".join(user_ids)
+        return self._delete(f"/groups/{group_id}/users/{j}")

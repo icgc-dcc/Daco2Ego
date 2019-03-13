@@ -207,7 +207,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't determine if user '{user}' has daco access"
         try:
-            return self.ego_client.is_member(user.email, self.daco_group)
+            return self.ego_client.is_member(self.daco_group, user.email)
         except Exception as e:
             self.count("has DACO permission check", err=True)
             raise LookupError(msg, e)
@@ -216,7 +216,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't determine if user '{user}' has cloud access"
         try:
-            return self.ego_client.is_member(user.email, self.cloud_group)
+            return self.ego_client.is_member(self.cloud_group, user.email)
         except Exception as e:
             self.count("has cloud access check", err=True)
             raise LookupError(msg, e)

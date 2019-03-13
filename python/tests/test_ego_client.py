@@ -72,7 +72,7 @@ def exists(client, user, status):
     assert client.user_exists(user) == status
 
 def has_daco(client, user, status):
-    assert client.is_member(user,"daco") == status
+    assert client.is_member("daco", user) == status
 
 def has_cloud(client, user, status):
-    assert client.is_member(user,"cloud") == status
+    assert client.is_member("cloud", user) == status

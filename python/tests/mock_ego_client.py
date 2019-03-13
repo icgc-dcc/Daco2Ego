@@ -27,7 +27,7 @@ class MockEgoSuccess(MockIO):
         self.log_call('get_users', group)
         return self.groups[group]
 
-    def is_member(self, user, group):
+    def is_member(self, group, user):
         self.log_call('is_member',(group,user))
         return user in self.groups[group]
 
