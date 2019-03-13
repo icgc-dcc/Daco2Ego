@@ -89,8 +89,8 @@ def init(config):
     cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
     users = get_users(daco, cloud)
 
-    daco_group = set(config['client']['daco_group'])
-    cloud_group = set(config['client']['cloud_group'])
+    daco_group = config['client']['daco_group']
+    cloud_group = config['client']['cloud_group']
     daco_client = DacoClient(daco_group, cloud_group, users, ego_client)
 
     return daco_client
