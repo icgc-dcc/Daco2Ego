@@ -156,13 +156,13 @@ class DacoClient(object):
             return f"Revoked all access for invalid user '{user}':(on " \
                 f"cloud access list, but not DACO)"
 
-        if not user.has_daco:
+        if not user.has_daco and (self.has_daco(user) or self.has_cloud(user)):
             self.count('revoke_daco')
             self.revoke_daco(user)
             self.revoke_cloud(user)
             return f"Revoked all access for user '{user}'"
 
-        if not user.has_cloud:
+        if not user.has_cloud and self.has_cloud(user):
             self.count('revoke_cloud')
             self.revoke_cloud(user)
             return f"Revoked cloud access for user '{user}'"

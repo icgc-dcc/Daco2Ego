@@ -31,6 +31,7 @@ ego = OrderedDict({'a@ca': (False, False),  # grant daco
                    'h@ca': (True, True),  # revoke cloud
                    'i@ca': (True, False),  # revoke all
                    'j@ca': (True, True),  # revoke all
+                   'k@ca': (False, True)  # revoke all (not on list)
                    })
 
 ego_users = {k for k, v in ego.items() if v[0] or v[1]}
@@ -269,13 +270,20 @@ def test_revoke_access_if_necessary():
         return (f"Revoked all access for invalid user '{u}':(on cloud access list, but not DACO)",
                 {'remove': [('daco', e(u)), ('cloud', e(u))]})
 
+    # User has daco and cloud, so we know need to revoke something once we know they still have  daco.
     def daco(u):
         return (f"Revoked all access for user '{u}'",
-                {'is_member': [('daco',e(u))], 'remove': [('daco', e(u))]})
+                {'is_member': [('daco', e(u))], 'remove': [('daco', e(u)), ('cloud', e(u))]})
 
     def cloud(u):
         return (f"Revoked cloud access for user '{u}'",
                 {'is_member': [('cloud', e(u))], 'remove': [('cloud', e(u))]})
+
+    # User has only cloud, so we need to check both daco and cloud to learn that they have permissions
+    # for us to revoke.
+    def cloud_only(u):
+        return (f"Revoked all access for user '{u}'",
+                {'is_member': [('daco', e(u)), ('cloud', e(u))], 'remove': [('daco', e(u)), ('cloud', e(u))]})
 
     def ok(_u):
         return None, {}
@@ -284,7 +292,8 @@ def test_revoke_access_if_necessary():
             (users[8], ok),
             (users[9], cloud),
             (User('i@ca', None, False, False), daco),
-            (User('j@ca', None, False, False), daco)
+            (User('j@ca', None, False, False), daco),
+            (User('k@ca', None, False, False), cloud_only)
             ]
     for user, f in data:
         expected, calls = f(user)
@@ -369,7 +378,8 @@ def test_update_ego():
                 "list, but not DACO)",
                 "Revoked cloud access for user 'h@ca(Person H)'",
                 "Revoked all access for user 'i@ca(None)'",
-                "Revoked all access for user 'j@ca(None)'"]
+                "Revoked all access for user 'j@ca(None)'",
+                "Revoked all access for user 'k@ca(None)'"]
 
     assert set(report) == set(expected)
 
@@ -378,16 +388,17 @@ def test_update_ego():
     expected_calls = dict([
         ('user_exists', ['a@ca', 'aa@ca', 'b@ca', 'd@ca', 'e@ca',
                          'f@ca', 'g@ca', 'h@ca']),
-        ('is_member', [('daco','a@ca'),('daco','aa@ca'),('cloud','aa@ca'),('daco','b@ca'),('cloud','b@ca'),
-                       ('cloud','d@ca'),('daco','f@ca'),('daco','g@ca'),('cloud','g@ca'),
-                       ('daco','h@ca'),('daco','i@ca'),('cloud','h@ca'),('daco','j@ca'),
-                       ('cloud','a@ca'),('cloud','f@ca')]),
-        ('add', [('daco','a@ca'),('daco','aa@ca'),('cloud','aa@ca'),('cloud','b@ca'),('daco','d@ca'),
-                ('daco','e@ca'),('cloud','e@ca')]),
+        ('is_member', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('daco', 'b@ca'), ('cloud', 'b@ca'),
+                       ('cloud', 'd@ca'), ('daco', 'f@ca'), ('daco', 'g@ca'), ('cloud', 'g@ca'),
+                       ('daco', 'h@ca'), ('daco', 'i@ca'), ('cloud', 'h@ca'), ('daco', 'j@ca'),
+                       ('cloud', 'a@ca'), ('cloud', 'f@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')]),
+        ('add', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('cloud', 'b@ca'), ('daco', 'd@ca'),
+                 ('daco', 'e@ca'), ('cloud', 'e@ca')]),
         ('create_user', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
-        ('get_users', ['daco','cloud']),
-        ('remove', [('daco','i@ca'),('daco','j@ca'),('daco','c@ca'),('cloud','c@ca'),('cloud','h@ca')])
-       ])
+        ('get_users', ['daco', 'cloud']),
+        ('remove', [('daco', 'i@ca'), ('cloud', 'i@ca'), ('daco', 'j@ca'), ('cloud', 'j@ca'), ('daco', 'c@ca'),
+                    ('cloud', 'c@ca'), ('cloud', 'h@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')])
+    ])
 
     actual_calls = e.get_calls()
 
@@ -401,4 +412,3 @@ def test_update_ego():
 
             assert set(a) == set(e)
         print("ok.")
-
