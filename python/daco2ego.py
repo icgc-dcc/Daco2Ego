@@ -81,18 +81,17 @@ def init(config):
     client_id = config['client']['client_id']
     client_secret = config['client']['client_secret']
     base_url = config['client']['base_url']
-    daco_policies = set(config['client']['daco_policies'])
-    cloud_policies = set(config['client']['cloud_policies'])
 
     rest_client = get_oauth_authenticated_client(base_url, client_id, client_secret)
-    ego_client = EgoClient(base_url, daco_policies,
-                           cloud_policies, rest_client)
+    ego_client = EgoClient(base_url, rest_client)
 
     daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
     cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
-
     users = get_users(daco, cloud)
-    daco_client = DacoClient(users, ego_client)
+
+    daco_group = config['client']['daco_group']
+    cloud_group = config['client']['cloud_group']
+    daco_client = DacoClient(daco_group, cloud_group, users, ego_client)
 
     return daco_client
 
@@ -103,6 +102,8 @@ def scream(msg, e):
 
 
 def main(_program_name, *args):
+    config = None
+    slack_client = None
     try:
         if args:
             config = read_config(args[0])
@@ -124,12 +125,12 @@ def main(_program_name, *args):
     try:
         daco_client = init(config)
     except KeyError as e:
-        issues = ["Daco2Ego configuration file error: missing entry for " + str(e) ]
+        issues = ["Daco2Ego configuration file error: missing entry for " + str(e)]
         counts, errors = {}, issues
         ran = False
     except Exception as e:
         # Scenario 5 (Start-up failed)
-        issues = ["DACO client init error:" + str(type(e)) + '(' + str(e)+ ')']
+        issues = ["DACO client init error:" + str(type(e)) + '(' + str(e) + ')']
         counts, errors = {}, issues
         ran = False
     else:

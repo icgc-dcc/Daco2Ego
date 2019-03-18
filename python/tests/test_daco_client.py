@@ -31,15 +31,25 @@ ego = OrderedDict({'a@ca': (False, False),  # grant daco
                    'h@ca': (True, True),  # revoke cloud
                    'i@ca': (True, False),  # revoke all
                    'j@ca': (True, True),  # revoke all
+                   'k@ca': (False, True)  # revoke all (not on list)
                    })
+
+ego_users = {k for k, v in ego.items() if v[0] or v[1]}
+cloud_group = "cloud"
+daco_group = "daco"
 
 
 def daco_client(success=True):
+    groups = {'users': list(ego.keys()),
+              daco_group: [k for k, v in ego.items() if v[0]],
+              cloud_group: [k for k, v in ego.items() if v[1]]
+              }
+
     if success:
-        e = MockEgoSuccess(ego)
+        e = MockEgoSuccess(groups)
     else:
-        e = MockEgoFailure(ego)
-    d = DacoClient(users, e)
+        e = MockEgoFailure(groups)
+    d = DacoClient(daco_group, cloud_group, users, e)
     return d, e
 
 
@@ -68,21 +78,21 @@ def run_test(method_name, args, compare, err_msg):
 def run_user_test(user, method_name, call_results, exception_message):
     def compare(result, e):
         assert result is None
-        assert e.get_calls() == {method_name: call_results}
+        assert e.get_calls() == call_results
 
     run_test(method_name, (user,), compare, exception_message)
 
 
 def run_io_tests():
     u = users[0]
-    tests = {'create_user': ([(u.email, u.name)], f"Can't create user '{u}'"),
-             'revoke_daco': ([u.email],
+    tests = {'create_user': ({'create_user': [(u.email, u.name)]}, f"Can't create user '{u}'"),
+             'revoke_daco': ({'remove': [('daco', u.email)]},
                              f"Can't revoke daco access for user '{u}'"),
-             'revoke_cloud': ([u.email],
+             'revoke_cloud': ({'remove': [('cloud', u.email)]},
                               f"Can't revoke cloud access for user '{u}'"),
-             'grant_daco': ([u.email],
+             'grant_daco': ({'add': [('daco', u.email)]},
                             f"Can't grant daco access to user '{u}'"),
-             'grant_cloud': ([u.email],
+             'grant_cloud': ({'add': [('cloud', u.email)]},
                              f"Can't grant cloud access to user '{u}'"),
              }
     for k, v in tests.items():
@@ -119,9 +129,11 @@ def run_access_checks():
 
 
 def check_exists(user, expected):
+    print(f'trying to see if user {user} exists, expected={expected}')
+
     def compare(result, e):
-        assert result == expected
         assert e.get_calls() == {f'user_exists': [f'{user.email}']}
+        assert result == expected
 
     run_test('user_exists', (user,), compare,
              f"Can't tell if user '{user} is already in ego")
@@ -134,8 +146,8 @@ def run_existence_checks():
 
 def run_get_users_test():
     def compare(result, e):
-        assert e.get_calls() == {'get_daco_users': ['Called']}
-        assert result == ego.keys()
+        assert e.get_calls() == {'get_users': ['daco', 'cloud']}
+        assert result == ego_users
 
     msg = f"Can't get list of daco users from ego"
     run_test('fetch_ego_ids', (), compare, msg)
@@ -157,14 +169,14 @@ def test_io():
 
 def test_get_user():
     e = None  # no ego client methods should be called! Fail if they are!
-    d = DacoClient(users, e)
+    d = DacoClient(daco_group, cloud_group, users, e)
     user = users[0]  # Person A
     u = d.get_user(user.email)
     assert u == user
 
 
 def test_is_unique():
-    d = DacoClient(users, None)
+    d = DacoClient(daco_group, cloud_group, users, None)
     user1 = users[0]
     user2 = User(*user_list[0])
 
@@ -187,14 +199,13 @@ def test_new_user():
     def daco(u):
         return (f"Created user '{u}' with daco access",
                 {'create_user': ([(u.email, u.name)]),
-                 'grant_daco': ([u.email])
+                 'add': [('daco', u.email)]
                  })
 
     def cloud(u):
         return (f"Created user '{u}' with cloud access",
                 {'create_user': ([(u.email, u.name)]),
-                 'grant_daco': ([u.email]),
-                 'grant_cloud': ([u.email]),
+                 'add': [('daco', u.email), ('cloud', u.email)]
                  }
                 )
 
@@ -226,23 +237,22 @@ def test_existing_user():
 
 
 def expected_grants(user, grant_daco, grant_cloud):
-    e = [f'{user.email}']
+    e = f'{user.email}'
     if grant_daco and grant_cloud:
         return (f"Granted daco and cloud to existing user '{user}'",
-                {'has_daco': e,
-                 'grant_daco': e,
-                 'has_cloud': e,
-                 'grant_cloud': e})
+                {'add': [('daco', e), ('cloud', e)],
+                 'is_member': [('daco', e), ('cloud', e)]})
     elif grant_daco:
         return (f"Granted daco to existing user '{user}'",
-                {'has_daco': e,
-                 'grant_daco': e})
+                {'add': [('daco', e)],
+                 'is_member': [('daco', e)]})
     elif grant_cloud:
         return (f"Granted cloud to existing user '{user}",
-                {'has_daco': e, 'has_cloud': e, 'grant_cloud': e})
+                {'add': [('cloud', e)],
+                 'is_member': [('daco', e), ('cloud', e)]})
     else:
         # return f"Existing user '{user}' was set up correctly."
-        return None, {'has_daco': e}
+        return None, {'is_member': [('daco', e)]}
 
 
 def run_test_revoke(user, expected, calls):
@@ -253,29 +263,41 @@ def run_test_revoke(user, expected, calls):
 
 
 def test_revoke_access_if_necessary():
-    def invalid(u):
-        return f"Revoked all access for invalid user " \
-            f"'{u}':(on cloud access list, but not DACO)"
+    def e(u):
+        return f'{u.email}'
 
+    def invalid(u):
+        return (f"Revoked all access for invalid user '{u}':(on cloud access list, but not DACO)",
+                {'remove': [('daco', e(u)), ('cloud', e(u))]})
+
+    # User has daco and cloud, so we know need to revoke something once we know they still have  daco.
     def daco(u):
-        return f"Revoked all access for user '{u}'"
+        return (f"Revoked all access for user '{u}'",
+                {'is_member': [('daco', e(u))], 'remove': [('daco', e(u)), ('cloud', e(u))]})
 
     def cloud(u):
-        return f"Revoked cloud access for user '{u}'"
+        return (f"Revoked cloud access for user '{u}'",
+                {'is_member': [('cloud', e(u))], 'remove': [('cloud', e(u))]})
+
+    # User has only cloud, so we need to check both daco and cloud to learn that they have permissions
+    # for us to revoke.
+    def cloud_only(u):
+        return (f"Revoked all access for user '{u}'",
+                {'is_member': [('daco', e(u)), ('cloud', e(u))], 'remove': [('daco', e(u)), ('cloud', e(u))]})
 
     def ok(_u):
-        return None
+        return None, {}
 
-    data = [(users[4], invalid, {'revoke_daco','revoke_cloud'}),
-            (users[8], ok, {}),
-            (users[9], cloud, {'has_cloud', 'revoke_cloud'}),
-            (User('i@ca', None, False, False), daco, {'has_daco', 'revoke_daco'}),
-            (User('j@ca', None, False, False), daco, {'has_daco', 'revoke_daco'}),
+    data = [(users[4], invalid),
+            (users[8], ok),
+            (users[9], cloud),
+            (User('i@ca', None, False, False), daco),
+            (User('j@ca', None, False, False), daco),
+            (User('k@ca', None, False, False), cloud_only)
             ]
-    for user, f, call_names in data:
-        e = [f'{user.email}']
-        calls = {call: e for call in call_names}
-        run_test_revoke(user, f(user), calls)
+    for user, f in data:
+        expected, calls = f(user)
+        run_test_revoke(user, expected, calls)
 
 
 def run_test_grant(user, expected, calls):
@@ -356,21 +378,37 @@ def test_update_ego():
                 "list, but not DACO)",
                 "Revoked cloud access for user 'h@ca(Person H)'",
                 "Revoked all access for user 'i@ca(None)'",
-                "Revoked all access for user 'j@ca(None)'"]
+                "Revoked all access for user 'j@ca(None)'",
+                "Revoked all access for user 'k@ca(None)'"]
 
-    assert report == expected
+    assert set(report) == set(expected)
 
     print(e.get_calls())
 
-    assert e.get_calls() == OrderedDict([
+    expected_calls = dict([
         ('user_exists', ['a@ca', 'aa@ca', 'b@ca', 'd@ca', 'e@ca',
                          'f@ca', 'g@ca', 'h@ca']),
-        ('has_daco', ['a@ca', 'aa@ca', 'b@ca', 'f@ca', 'g@ca', 'h@ca', 'i@ca', 'j@ca']),
-        ('grant_daco', ['a@ca', 'aa@ca', 'd@ca', 'e@ca']),
-        ('has_cloud', ['aa@ca', 'b@ca', 'g@ca', 'a@ca', 'f@ca', 'h@ca',
-                       'd@ca']),
-        ('grant_cloud', ['aa@ca', 'b@ca', 'e@ca']),
+        ('is_member', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('daco', 'b@ca'), ('cloud', 'b@ca'),
+                       ('cloud', 'd@ca'), ('daco', 'f@ca'), ('daco', 'g@ca'), ('cloud', 'g@ca'),
+                       ('daco', 'h@ca'), ('daco', 'i@ca'), ('cloud', 'h@ca'), ('daco', 'j@ca'),
+                       ('cloud', 'a@ca'), ('cloud', 'f@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')]),
+        ('add', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('cloud', 'b@ca'), ('daco', 'd@ca'),
+                 ('daco', 'e@ca'), ('cloud', 'e@ca')]),
         ('create_user', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
-        ('get_daco_users', ['Called']),
-        ('revoke_daco', ['c@ca', 'i@ca', 'j@ca']),
-        ('revoke_cloud', ['c@ca','h@ca'])])
+        ('get_users', ['daco', 'cloud']),
+        ('remove', [('daco', 'i@ca'), ('cloud', 'i@ca'), ('daco', 'j@ca'), ('cloud', 'j@ca'), ('daco', 'c@ca'),
+                    ('cloud', 'c@ca'), ('cloud', 'h@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')])
+    ])
+
+    actual_calls = e.get_calls()
+
+    for fn in expected_calls:
+        print(f"Checking calls for function {fn}")
+        a = actual_calls[fn]
+        e = expected_calls[fn]
+        if a == e:
+            assert a == e
+        else:
+
+            assert set(a) == set(e)
+        print("ok.")

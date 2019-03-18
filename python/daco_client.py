@@ -3,7 +3,7 @@ from daco_user import User
 
 
 class DacoClient(object):
-    def __init__(self, users, ego_client):
+    def __init__(self, daco_group, cloud_group, users, ego_client):
         """
         :param users: A list of User objects
 
@@ -13,6 +13,8 @@ class DacoClient(object):
         """
         self.ego_client = ego_client
         self.users = users
+        self.daco_group = daco_group
+        self.cloud_group = cloud_group
         # make a map of ego id == user.email to user, so that we can
         # find ego users with daco permissions.
         self._user_map = {u.email.lower(): u for u in users}
@@ -62,7 +64,7 @@ class DacoClient(object):
         return self.revoke_users(users)
 
     def get_daco_users_from_ego(self):
-        return self.get_ego_users(self.ego_client.get_daco_users())
+        return self.get_ego_users(self.fetch_ego_ids())
 
     def get_ego_users(self, ego_id_list):
         return map(self.get_user, ego_id_list)
@@ -154,17 +156,16 @@ class DacoClient(object):
             return f"Revoked all access for invalid user '{user}':(on " \
                 f"cloud access list, but not DACO)"
 
-        if not user.has_daco:
-            if self.has_daco(user):
-                self.count('revoke_daco')
-                self.revoke_daco(user)
+        if not user.has_daco and (self.has_daco(user) or self.has_cloud(user)):
+            self.count('revoke_daco')
+            self.revoke_daco(user)
+            self.revoke_cloud(user)
             return f"Revoked all access for user '{user}'"
 
-        if not user.has_cloud:
-            if self.has_cloud(user):
-                self.count('revoke_cloud')
-                self.revoke_cloud(user)
-                return f"Revoked cloud access for user '{user}'"
+        if not user.has_cloud and self.has_cloud(user):
+            self.count('revoke_cloud')
+            self.revoke_cloud(user)
+            return f"Revoked cloud access for user '{user}'"
         return None
 
     #####################################################################
@@ -176,8 +177,11 @@ class DacoClient(object):
         """
         if msg is None:
             msg = "Can't get list of daco users from ego"
+
         try:
-            return self.ego_client.get_daco_users()
+            daco_users = set(self.ego_client.get_users(self.daco_group))
+            cloud_users = set(self.ego_client.get_users(self.cloud_group))
+            return daco_users | cloud_users
         except Exception as e:
             raise LookupError(msg, e)
 
@@ -202,7 +206,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't determine if user '{user}' has daco access"
         try:
-            return self.ego_client.has_daco(user.email)
+            return self.ego_client.is_member(self.daco_group, user.email)
         except Exception as e:
             self.count("has DACO permission check", err=True)
             raise LookupError(msg, e)
@@ -211,7 +215,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't determine if user '{user}' has cloud access"
         try:
-            return self.ego_client.has_cloud(user.email)
+            return self.ego_client.is_member(self.cloud_group, user.email)
         except Exception as e:
             self.count("has cloud access check", err=True)
             raise LookupError(msg, e)
@@ -220,7 +224,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't grant daco access to user '{user}'"
         try:
-            self.ego_client.grant_daco(user.email)
+            self.ego_client.add(self.daco_group, [user.email])
         except Exception as e:
             self.count("grant DACO access", err=True)
             raise LookupError(msg, e)
@@ -229,7 +233,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't grant cloud access to user '{user}'"
         try:
-            self.ego_client.grant_cloud(user.email)
+            self.ego_client.add(self.cloud_group, [user.email])
         except Exception as e:
             self.count("grant cloud access", err=True)
             raise LookupError(msg, e)
@@ -238,7 +242,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't revoke daco access for user '{user}'"
         try:
-            self.ego_client.revoke_daco(user.email)
+            self.ego_client.remove(self.daco_group, [user.email])
         except Exception as e:
             self.count("revoke DACO access", err=True)
             raise LookupError(msg, e)
@@ -247,7 +251,7 @@ class DacoClient(object):
         if msg is None:
             msg = f"Can't revoke cloud access for user '{user}'"
         try:
-            self.ego_client.revoke_cloud(user.email)
+            self.ego_client.remove(self.cloud_group, [user.email])
         except Exception as e:
             self.count("revoke cloud access", err=True)
             raise LookupError(msg, e)

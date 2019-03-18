@@ -19,52 +19,39 @@ class MockIO(object):
 
 
 class MockEgoSuccess(MockIO):
-    def __init__(self, users):
+    def __init__(self, groups):
         super(MockEgoSuccess, self).__init__()
-        self._daco_users = OrderedDict(users)
+        self.groups = groups
 
-    def get_daco_users(self):
-        self.log_call('get_daco_users', 'Called')
-        return self._daco_users.keys()
+    def get_users(self, group):
+        self.log_call('get_users', group)
+        return self.groups[group]
+
+    def is_member(self, group, user):
+        self.log_call('is_member',(group,user))
+        return user in self.groups[group]
 
     def user_exists(self, user):
+        print(f"Checking to see if user {user} exists")
         self.log_call('user_exists', user)
-        return user in self._daco_users
+        for g in self.groups.values():
+            if user in g:
+                return True
+        return False
 
     def create_user(self, user, name):
-        self._daco_users[user] = (False, False)
         self.log_call('create_user', (user, name))
+        self.groups['users'] = user
 
-    def has_daco(self, user):
-        self.log_call('has_daco', user)
-        try:
-            return self._daco_users[user][0]
-        except KeyError:
-            raise MockEgoException(f"User '{user}' does not exist in ego")
+    def add(self, group, users):
+        assert len(users) == 1
+        self.log_call('add', (group,users[0]))
+        self.groups[group] += users
 
-    def grant_daco(self, user):
-        cloud = self._daco_users[user][1]
-        self._daco_users[user] = (True, cloud)
-        self.log_call('grant_daco', user)
-
-    def revoke_daco(self, user):
-        self._daco_users[user] = (False, False)
-        self.log_call('revoke_daco', user)
-
-    def has_cloud(self, user):
-        self.log_call('has_cloud', user)
-        try:
-            return self._daco_users[user][1]
-        except KeyError:
-            raise MockEgoException(f"User '{user}' does not exist in ego")
-
-    def grant_cloud(self, user):
-        self._daco_users[user] = (True, True)
-        self.log_call('grant_cloud', user)
-
-    def revoke_cloud(self, user):
-        self._daco_users[user] = (True, False)
-        self.log_call('revoke_cloud', user)
+    def remove(self, group, users):
+        assert len(users) == 1
+        self.log_call('remove',(group, users[0]))
+        self.groups[group] += users
 
 
 class MockEgoException(Exception):
