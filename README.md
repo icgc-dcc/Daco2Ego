@@ -17,4 +17,4 @@ crontab crontab
 That's it! 
 
 ## Development
-Requires python 3.6 due to the use of format strings. 
+Requires Python 3.6 due to the use of format strings. 
