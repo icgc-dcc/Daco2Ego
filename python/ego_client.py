@@ -98,7 +98,7 @@ class EgoClient(object):
     def create_user(self, user, name, ego_type="USER"):
         first, _, last = name.rpartition(" ")
         j = json.dumps({"email": user, "firstName": first, "lastName": last, "userType": ego_type,
-                        "status": "Approved"})
+                        "status": "APPROVED"})
         reply = self._post("/users", j)
         r = json.loads(reply)
         return r
