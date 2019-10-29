@@ -17,4 +17,4 @@ RUN mkdir -p /daco2ego/files
 RUN chown nobody:nobody /daco2ego/files
 EXPOSE 8080 
 VOLUME config config
-ENTRYPOINT ["/daco2ego/init.sh"]
+ENTRYPOINT ["/daco2ego/daco2ego.py"]
