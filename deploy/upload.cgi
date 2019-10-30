@@ -3,6 +3,7 @@ echo "Content-type: text/plain"
 echo
 
 . /daco2ego/set_vars.sh
+DACO_FILE=$(cat /daco2ego/daco_file)
 echo -n "Uploading..."
 sed -e "s///g" | \
 sed -e "/^$/,/^$/{/^$/d;p};d" | \
