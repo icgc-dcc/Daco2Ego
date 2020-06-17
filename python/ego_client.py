@@ -40,7 +40,6 @@ class EgoClient(object):
             return r.text
         raise IOError(f"Error trying to GET {r.url}", r)
 
-    @retry_oauth
     def _get_json(self, endpoint):
         result = self._get(endpoint)
         j = json.loads(result)
