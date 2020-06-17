@@ -13,12 +13,12 @@ def retry_oauth(func):
 
     def func_wrapper(self, *args, **kwargs):
         try:
-            func(self, *args, **kwargs)
+            return func(self, *args, **kwargs)
         except TokenExpiredError as e:
             logging.info('Token expired for Daco2Ego, requesting new authorization.')
             if self._rest_client_factory is not None:
                 self._rest_client = self._rest_client_factory()
-                func(self, *args, **kwargs)
+                return func(self, *args, **kwargs)
             else:
                 raise e
 
