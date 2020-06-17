@@ -75,7 +75,6 @@ def get_oauth_authenticated_client(base_url, client_id, client_secret):
     return oauth
 
 
-
 def init(config):
     key = config['aes']['key']
     iv = config['aes']['iv']
@@ -86,7 +85,7 @@ def init(config):
 
     rest_client = get_oauth_authenticated_client(base_url, client_id, client_secret)
 
-    ego_client = EgoClient(base_url, rest_client,
+    ego_client = EgoClient(base_url, rest_client,  # Want to create a factory for new oauth clients
                            lambda: get_oauth_authenticated_client(base_url, client_id, client_secret))
 
     daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
