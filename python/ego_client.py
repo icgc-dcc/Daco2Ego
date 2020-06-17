@@ -5,7 +5,7 @@ from oauthlib.oauth2 import TokenExpiredError
 
 def retry_oauth(func):
     """
-    Decorator for
+    Decorator for methods making rest requests
     Retry the request if encountering a TokenExpiredError by generating a new rest client with a new OAuth2 Bearer Token
     :param func: function to decorate
     :return: decorated function
