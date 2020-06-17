@@ -1,24 +1,52 @@
 import json
+import logging
+from oauthlib.oauth2 import TokenExpiredError
+
+
+def retry_oauth(func):
+    """
+    Decorator for methods making rest requests
+    Retry the request if encountering a TokenExpiredError by generating a new rest client with a new OAuth2 Bearer Token
+    :param func: function to decorate
+    :return: decorated function
+    """
+
+    def func_wrapper(self, *args, **kwargs):
+        try:
+            func(self, *args, **kwargs)
+        except TokenExpiredError as e:
+            logging.info('Token expired for Daco2Ego, requesting new authorization.')
+            if self._rest_client_factory is not None:
+                self._rest_client = self._rest_client_factory()
+                func(self, *args, **kwargs)
+            else:
+                raise e
+
+    return func_wrapper
 
 
 class EgoClient(object):
-    def __init__(self, base_url, rest_client):
+    def __init__(self, base_url, rest_client, rest_client_factory=None):
         self.base_url = base_url
 
+        self._rest_client_factory = rest_client_factory  # Function to produce new rest client if needed to re-auth
         self._rest_client = rest_client
         self._rest_client.stream = False
 
+    @retry_oauth
     def _get(self, endpoint):
         r = self._rest_client.get(self.base_url + endpoint)
         if r.ok:
             return r.text
         raise IOError(f"Error trying to GET {r.url}", r)
 
+    @retry_oauth
     def _get_json(self, endpoint):
         result = self._get(endpoint)
         j = json.loads(result)
         return j
 
+    @retry_oauth
     def _post(self, endpoint, data):
         headers = {'Content-type': 'application/json'}
         r = self._rest_client.post(self.base_url + endpoint, data=data,
@@ -27,6 +55,7 @@ class EgoClient(object):
             return r.text
         raise IOError(f"Error trying to POST to {endpoint}", r, data)
 
+    @retry_oauth
     def _delete(self, endpoint):
         return self._rest_client.delete(self.base_url + endpoint)
 
