@@ -3,6 +3,7 @@
 import csv
 import json
 import sys
+import logging
 
 from oauthlib.oauth2 import BackendApplicationClient
 from requests.auth import HTTPBasicAuth
@@ -74,6 +75,7 @@ def get_oauth_authenticated_client(base_url, client_id, client_secret):
     return oauth
 
 
+
 def init(config):
     key = config['aes']['key']
     iv = config['aes']['iv']
@@ -83,7 +85,9 @@ def init(config):
     base_url = config['client']['base_url']
 
     rest_client = get_oauth_authenticated_client(base_url, client_id, client_secret)
-    ego_client = EgoClient(base_url, rest_client)
+
+    ego_client = EgoClient(base_url, rest_client,
+                           lambda: get_oauth_authenticated_client(base_url, client_id, client_secret))
 
     daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
     cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
@@ -93,6 +97,7 @@ def init(config):
     cloud_group = config['client']['cloud_group']
     daco_client = DacoClient(daco_group, cloud_group, users, ego_client)
 
+    logging.info('Daco Client Initialized.');
     return daco_client
 
 
@@ -116,11 +121,15 @@ def main(_program_name, *args):
         scream("Can't get configuration for daco2ego!", e)
         exit(2)
 
+    logging.info('Configuration Loaded.')
+
     try:
         slack_client = SlackReporter(config['slack']['url'])
     except Exception as e:
         scream("Can't get slack client to report errors!", e)
         exit(6)  # ENXIO (No such device or address)
+
+    logging.info('Slack webhook configured.')
 
     try:
         daco_client = init(config)
@@ -136,6 +145,7 @@ def main(_program_name, *args):
     else:
         # Scenarios 1,2,3,4,6
         try:
+            logging.info("Starting Ego Update...")
             issues = daco_client.update_ego()
             counts, errors = daco_client.get_summary()
             ran = True
