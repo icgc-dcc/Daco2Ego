@@ -1,8 +1,8 @@
-FROM alpine 
+FROM alpine:3.10.5
 WORKDIR /daco2ego
-RUN apk add --no-cache python3 
+RUN apk add --no-cache python3
 RUN apk add --no-cache bash 
-RUN apk add --no-cache build-base 
+RUN apk add --no-cache build-base
 ADD python/*.py ./requirements.txt ./ 
 RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
