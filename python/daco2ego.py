@@ -42,7 +42,7 @@ def csv_to_dict(data, encoding_override=None):
             openid = u['OPENID']
 
         try:
-            user_name = u['user_name']
+            user_name = u['user name']
         except:
             user_name = u['USER NAME']
 
