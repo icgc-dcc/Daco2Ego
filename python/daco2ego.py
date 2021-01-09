@@ -30,7 +30,6 @@ def csv_to_dict(data, encoding_override=None):
     else:
         text = data.decode(encoding_override)
 
-    print(text)
     csv_reader = csv.DictReader(text.splitlines())
 
     ret_list = []
