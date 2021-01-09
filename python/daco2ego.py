@@ -24,10 +24,31 @@ def read_config(name="config/default.conf"):
     return conf
 
 
-def csv_to_dict(data):
-    text = data.decode()
+def csv_to_dict(data, encoding_override=None):
+    if encoding_override is None:
+        text = data.decode()
+    else:
+        text = data.decode(encoding_override)
+
     csv_reader = csv.DictReader(text.splitlines())
-    return [(u['openid'], u['user name']) for u in csv_reader]
+
+    ret_list = []
+    for u in csv_reader:
+        print(u)
+
+        try:
+            openid = u['openid']
+        except:
+            openid = u['OPENID']
+
+        try:
+            user_name = u['user_name']
+        except:
+            user_name = u['USER NAME']
+
+        ret_list.append((openid, user_name))
+
+    return ret_list
 
 
 def users_with_access_to(data):
@@ -78,6 +99,7 @@ def get_oauth_authenticated_client(base_url, client_id, client_secret):
 def init(config):
     key = config['aes']['key']
     iv = config['aes']['iv']
+    hexdump = config['aes'].get('hexdump', False)
 
     client_id = config['client']['client_id']
     client_secret = config['client']['client_secret']
@@ -88,8 +110,10 @@ def init(config):
     ego_client = EgoClient(base_url, rest_client,  # Want to create a factory for new oauth clients
                            lambda: get_oauth_authenticated_client(base_url, client_id, client_secret))
 
-    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv))
-    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv))
+    encoding_override = config.get('file_encoding_override', None)
+
+    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv, hexdump=hexdump), encoding_override)
+    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv, hexdump=hexdump), encoding_override)
     users = get_users(daco, cloud)
 
     daco_group = config['client']['daco_group']
