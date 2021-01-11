@@ -37,9 +37,9 @@ def csv_to_dict(data, encoding_override=None):
         print(u)
 
         try:
-            openid = u['openid']
+            openid = u['openid'].lower()
         except:
-            openid = u['OPENID']
+            openid = u['OPENID'].lower()
 
         try:
             user_name = u['user name']

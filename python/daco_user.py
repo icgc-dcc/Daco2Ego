@@ -2,7 +2,7 @@
 class User(object):
     def __init__(self, email, name, has_daco, has_cloud):
         self.name = name
-        self.email = email
+        self.email = email.lower()
         self.has_daco = has_daco
         self.has_cloud = has_cloud
 
@@ -20,7 +20,7 @@ class User(object):
 
     def __eq__(self, other):
         return (self.name == other.name and
-                self.email == other.email and
+                self.email.lower() == other.email.lower() and
                 self.has_daco == other.has_daco and
                 self.has_cloud == other.has_cloud)
 
