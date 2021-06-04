@@ -63,7 +63,6 @@ class EgoClient(object):
         return self._rest_client.delete(self.base_url + endpoint)
 
     def _field_search(self, query, name, value):
-        # query = endpoint + f"?{name}={value}&limit=9999999"
         result = self._get_json(query)
         if result['count'] == 0:
             raise IOError(f"No matches for {value} from ego endpoint {query}",

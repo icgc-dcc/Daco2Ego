@@ -369,7 +369,6 @@ def test_update_ego():
                        ('daco', 'h@ca'), ('daco', 'i@ca'), ('cloud', 'h@ca'), ('daco', 'j@ca'),
                        ('cloud', 'a@ca'), ('cloud', 'f@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')]),
         ('add', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('cloud', 'b@ca')]),
-        # ('ego_user_not_found', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
         ('ego_user_not_found', [('d@ca'), ('e@ca')]),
         ('get_users', ['daco', 'cloud']),
         ('remove', [('daco', 'i@ca'), ('cloud', 'i@ca'), ('daco', 'j@ca'), ('cloud', 'j@ca'), ('daco', 'c@ca'),
