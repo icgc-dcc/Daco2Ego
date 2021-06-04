@@ -6,7 +6,7 @@ def zero_defaults(fields, dictionary):
 
 def summarize(c):
     fields = ("new_daco", "new_cloud", "grant_daco", "grant_cloud", "grant_both",
-              "revoke_daco", "revoke_cloud", "revoke_invalid")
+              "revoke_daco", "revoke_cloud", "revoke_invalid", "ego_user_not_found")
     counts = zero_defaults(fields, c)
 
     counts['new'] = counts['new_daco'] + counts['new_cloud']
@@ -21,8 +21,10 @@ def summarize(c):
                ('revoke_cloud', "Revoked Cloud access from {revoke_cloud} existing users."),
                ('revoke',
                 "Revoked DACO and Cloud access from {revoke} existing users "
-                "({revoke_invalid} of them were invalid users).")
+                "({revoke_invalid} of them were invalid users)."),
+               ('ego_user_not_found', "{ego_user_not_found} users were not registered in Ego.")
                )
+
     report_fields = [u[0] for u in updates]
     if not any([counts[f] for f in report_fields]):
         return "*Updates*: No updates\n"
@@ -39,10 +41,10 @@ def summarize(c):
 
 
 def report_warnings(c):
-    fields = ("multiple_entries", "invalid", "invalid_email", "revoke_invalid")
+    fields = ("multiple_entries", "invalid", "invalid_email", "revoke_invalid", "ego_user_not_found")
     counts = zero_defaults(fields, c)
 
-    if not (counts['multiple_entries'] or counts['invalid'] or counts['invalid_email']):
+    if not (counts['multiple_entries'] or counts['invalid'] or counts['invalid_email'] or counts['ego_user_notfound']):
         return ""
 
     report = "\n*Warnings*:\n"
@@ -50,7 +52,8 @@ def report_warnings(c):
     warnings = (('multiple_entries', "{} multiple entries found in configuration file"),
                 ('invalid_email', "{} invalid OpenId email addresses found in configuration file"),
                 ('invalid', '{}' + f" invalid users found with Cloud access but not DACO access "
-                f"({counts['revoke_invalid']} had access to revoke)"))
+                f"({counts['revoke_invalid']} had access to revoke)"),
+                ('ego_user_not_found', "{} users from configuration file not found in Ego."))
 
     for category, message in warnings:
         try:

@@ -37,11 +37,8 @@ class MockEgoSuccess(MockIO):
         for g in self.groups.values():
             if user in g:
                 return True
+        self.log_call('ego_user_not_found', user)
         return False
-
-    def create_user(self, user, name):
-        self.log_call('create_user', (user, name))
-        self.groups['users'] = user
 
     def add(self, group, users):
         assert len(users) == 1

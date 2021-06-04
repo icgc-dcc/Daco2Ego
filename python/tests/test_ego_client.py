@@ -37,14 +37,9 @@ def test_ego_client():
     client = init()
     user, name = "test@gmail.com", "Test User"
 
+    # users cannot be created manually in Ego 4, so this test needs to be run with an existing user
     if not client.user_exists(user):
-        has_daco(client, user, False)
-        has_cloud(client, user, False)
-
-        u = client.create_user(user, name)
-        print(u)
-
-        assert client.user_exists(user)
+        assert client.ego_user_not_found(user)
 
     exists(client, user, True)
     has_daco(client, user, False)

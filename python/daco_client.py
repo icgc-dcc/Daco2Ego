@@ -103,20 +103,9 @@ class DacoClient(object):
         if self.ego_client.user_exists(user.email):
             return self.existing_user(user)
 
-        return self.new_user(user)
+        self.count('ego_user_not_found')
+        return f"User is not in ego, no access granted to '{user}'"
 
-    # scenario 1
-    def new_user(self, user):
-        self.create_user(user)
-        self.grant_daco(user)
-
-        if not user.has_cloud:
-            self.count('new_daco')
-            return f"Created user '{user}' with daco access"
-
-        self.grant_cloud(user)
-        self.count('new_cloud')
-        return f"Created user '{user}' with cloud access"
 
     # scenario 2
     def existing_user(self, user):
@@ -190,16 +179,17 @@ class DacoClient(object):
             return self.ego_client.user_exists(user.email)
         except Exception as e:
             self.count('user exists check', err=True)
+            self.count(f"Ego user not found for user `{user}'", err=True)
             raise LookupError(f"Can't tell if user '{user} is already in "
                               f"ego", e)
 
-    def create_user(self, user, msg=None):
+    def ego_user_not_found(self, user, msg=None):
         if msg is None:
-            msg = f"Can't create user '{user}'"
+            msg = f"User does not exist in ego, no access changes for '{user}'"
         try:
-            self.ego_client.create_user(user.email, user.name)
+            self.ego_client
         except Exception as e:
-            self.count('create user', err=True)
+            self.count(f"Ego user not found for user `{user}'", err=True)
             raise LookupError(msg, e)
 
     def has_daco(self, user, msg=None):

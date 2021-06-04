@@ -2,6 +2,8 @@ import json
 import logging
 from oauthlib.oauth2 import TokenExpiredError
 
+DEFAULT_PROVIDER = "GOOGLE"
+
 
 def retry_oauth(func):
     """
@@ -24,7 +26,6 @@ def retry_oauth(func):
 
     return func_wrapper
 
-
 class EgoClient(object):
     def __init__(self, base_url, rest_client, rest_client_factory=None):
         self.base_url = base_url
@@ -32,6 +33,9 @@ class EgoClient(object):
         self._rest_client_factory = rest_client_factory  # Function to produce new rest client if needed to re-auth
         self._rest_client = rest_client
         self._rest_client.stream = False
+
+    def getDefaultProvider(self):
+        return DEFAULT_PROVIDER
 
     @retry_oauth
     def _get(self, endpoint):
@@ -58,8 +62,8 @@ class EgoClient(object):
     def _delete(self, endpoint):
         return self._rest_client.delete(self.base_url + endpoint)
 
-    def _field_search(self, endpoint, name, value):
-        query = endpoint + f"?{name}={value}&limit=9999999"
+    def _field_search(self, query, name, value):
+        # query = endpoint + f"?{name}={value}&limit=9999999"
         result = self._get_json(query)
         if result['count'] == 0:
             raise IOError(f"No matches for {value} from ego endpoint {query}",
@@ -80,13 +84,29 @@ class EgoClient(object):
         :param group:
         :return:
         """
-        group_ids = self._field_search("/groups", "name", group)
+        query = f"/groups?name={group}"
+        group_ids = self._field_search(query, "name", group)
         if len(group_ids) > 1:
             raise LookupError(f"Multiple ids matched group '{group}': {group_ids}")
         return group_ids[0]['id']
 
     def _user_id(self, user):
-        user_ids = self._field_search("/users", "email", user)
+        filter_field = "email"
+        query = f"/users?{filter_field}={user}&providerType={DEFAULT_PROVIDER}"
+        result = self._get_json(query)
+
+        if result['count'] == 0:
+            self.ego_user_not_found(user)
+            raise IOError(f"No matches for {user} from ego endpoint {query}",
+                          result)
+
+        # Return only exact matches from the field search
+        user_ids = [item for item in result['resultSet']
+                   if item[filter_field].lower() == user.lower()]
+        if not user_ids:
+            raise LookupError(f"Can't find {user} in results from endpoint "
+                              f"{query}", result)
+
         if len(user_ids) > 1:
             raise LookupError(f"Multiple ids matched user '{user}': {user_ids}")
         return user_ids[0]['id']
@@ -120,16 +140,17 @@ class EgoClient(object):
         try:
             self._user_id(user)
         except LookupError:
+            self.ego_user_not_found(user)
             return False
         return True
 
-    def create_user(self, user, name, ego_type="USER"):
-        first, _, last = name.rpartition(" ")
-        j = json.dumps({"email": user, "firstName": first, "lastName": last, "type": ego_type,
-                        "status": "APPROVED"})
-        reply = self._post("/users", j)
-        r = json.loads(reply)
-        return r
+    def ego_user_not_found(self, user):
+        """
+        Returns true if the user is not found
+        :param user:
+        :return:
+        """
+        return True
 
     def add(self, group, users):
         """

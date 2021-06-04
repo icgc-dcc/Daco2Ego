@@ -1,4 +1,3 @@
-Crypto
 atomicwrites==1.2.1
 attrs==18.2.0
 certifi==2018.11.29

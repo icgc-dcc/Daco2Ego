@@ -10,8 +10,8 @@ user_list = [('a@ca', 'Person A', True, False),
              ('b@ca', 'Person B', True, True),  # duplicate B (report error)
              ('b@ca', 'Person Bee', True, True),  # duplicate B (processed)
              ('c@ca', 'Person C', False, True),  # cloud only (invalid)
-             ('d@ca', 'Person D', True, False),
-             ('e@ca', 'Person E', True, True),
+             ('d@ca', 'Person D', True, False),  # not in ego already, not added
+             ('e@ca', 'Person E', True, True),  # not in ego already, not added
              ('f@ca', 'Person F', True, False),
              ('g@ca', 'Person G', True, True),
              ('h@ca', 'Person H', True, False),
@@ -24,8 +24,6 @@ ego = OrderedDict({'a@ca': (False, False),  # grant daco
                    'aa@ca': (False, False),  # grant both (ignore name match)
                    'b@ca': (True, False),  # grant cloud
                    'c@ca': (False, True),  # revoke all (invalid)
-                   # d@ca: create user, grant daco
-                   # e@ca: create both
                    'f@ca': (True, False),  # do nothing
                    'g@ca': (True, True),  # do nothing
                    'h@ca': (True, True),  # revoke cloud
@@ -85,7 +83,8 @@ def run_user_test(user, method_name, call_results, exception_message):
 
 def run_io_tests():
     u = users[0]
-    tests = {'create_user': ({'create_user': [(u.email, u.name)]}, f"Can't create user '{u}'"),
+
+    tests = {
              'revoke_daco': ({'remove': [('daco', u.email)]},
                              f"Can't revoke daco access for user '{u}'"),
              'revoke_cloud': ({'remove': [('cloud', u.email)]},
@@ -93,7 +92,7 @@ def run_io_tests():
              'grant_daco': ({'add': [('daco', u.email)]},
                             f"Can't grant daco access to user '{u}'"),
              'grant_cloud': ({'add': [('cloud', u.email)]},
-                             f"Can't grant cloud access to user '{u}'"),
+                             f"Can't grant cloud access to user '{u}'")
              }
     for k, v in tests.items():
         run_user_test(u, k, v[0], v[1])
@@ -132,8 +131,12 @@ def check_exists(user, expected):
     print(f'trying to see if user {user} exists, expected={expected}')
 
     def compare(result, e):
-        assert e.get_calls() == {f'user_exists': [f'{user.email}']}
+        if (expected):
+            assert e.get_calls() == {f'user_exists': [f'{user.email}']}
+        else:
+            assert e.get_calls() == OrderedDict([('user_exists', [f'{user.email}']), ('ego_user_not_found', [f'{user.email}'])])
         assert result == expected
+
 
     run_test('user_exists', (user,), compare,
              f"Can't tell if user '{user} is already in ego")
@@ -186,35 +189,6 @@ def test_is_unique():
     assert d.is_unique_user(users[1])
     assert not d.is_unique_user(users[2])  # duplicate, not last => False
     assert d.is_unique_user(users[3])  # last duplicate => True
-
-
-def run_new_user_test(user, expected, calls):
-    d, e = daco_client()
-    result = d.new_user(user)
-    assert result == expected
-    assert e.get_calls() == calls
-
-
-def test_new_user():
-    def daco(u):
-        return (f"Created user '{u}' with daco access",
-                {'create_user': ([(u.email, u.name)]),
-                 'add': [('daco', u.email)]
-                 })
-
-    def cloud(u):
-        return (f"Created user '{u}' with cloud access",
-                {'create_user': ([(u.email, u.name)]),
-                 'add': [('daco', u.email), ('cloud', u.email)]
-                 }
-                )
-
-    data = [(users[5], daco),
-            (users[6], cloud)]
-
-    for user, access in data:
-        msg, calls = access(user)
-        run_new_user_test(user, msg, calls)
 
 
 def run_existing_user_test(user, msg, calls):
@@ -303,18 +277,19 @@ def test_revoke_access_if_necessary():
 def run_test_grant(user, expected, calls):
     d, e = daco_client()
 
-    # We've already tested new_user and existing_user, so just mock them
-    # and note that we've called them so our tests can verify that we
-    # got their results when we expected to.
-    def new(u):
-        e.log_call('new_user', u.email)
-        return "new"
+    # We've already tested existing_user, so just mock it
+    # and note that we've called it so our tests can verify that we
+    # got the results when we expected to.
+
+    def ego_user_not_found(u):
+        e.log_call('ego_user_not_found')
+        return "not_found"
 
     def old(u):
         e.log_call('existing_user', u.email)
         return "old"
 
-    d.new_user = new
+    d.ego_user_not_found = ego_user_not_found
     d.existing_user = old
 
     result = d.grant_access_if_necessary(user)
@@ -336,8 +311,8 @@ def test_grant_access_if_necessary():
     def invalid_user(u):
         return f"Warning: User '{u}' is invalid (in cloud file, but not in DACO)"
 
-    def new_user(_u):
-        return "new"
+    def ego_user_not_found(u):
+        return f"User is not in ego, no access granted to '{u}'"
 
     def old_user(_u):
         return "old"
@@ -345,7 +320,8 @@ def test_grant_access_if_necessary():
     data = [
         (users[0], old_user, {'user_exists', 'existing_user'}),
         (users[4], invalid_user, {}),
-        (users[5], new_user, {'user_exists', 'new_user'}),
+        (users[5], ego_user_not_found, {'user_exists', 'ego_user_not_found'}),
+        (users[6], ego_user_not_found, {'user_exists', 'ego_user_not_found'}),
         (users[2], duplicate, {}),
         (users[10], invalid_email, {})
     ]
@@ -368,8 +344,8 @@ def test_update_ego():
                 "daco file!",
                 "Granted cloud to existing user 'b@ca(Person Bee)",
                 "Warning: User 'c@ca(Person C)' is invalid (in cloud file, but not in DACO)",
-                "Created user 'd@ca(Person D)' with daco access",
-                "Created user 'e@ca(Person E)' with cloud access",
+                "User is not in ego, no access granted to 'd@ca(Person D)'",
+                "User is not in ego, no access granted to 'e@ca(Person E)'",
                 "Warning: User 'http://k.ca/openid/letmein(Person K)' does not "
                 "have a "
                 "valid email address",
@@ -389,12 +365,12 @@ def test_update_ego():
         ('user_exists', ['a@ca', 'aa@ca', 'b@ca', 'd@ca', 'e@ca',
                          'f@ca', 'g@ca', 'h@ca']),
         ('is_member', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('daco', 'b@ca'), ('cloud', 'b@ca'),
-                       ('cloud', 'd@ca'), ('daco', 'f@ca'), ('daco', 'g@ca'), ('cloud', 'g@ca'),
+                     ('daco', 'f@ca'), ('daco', 'g@ca'), ('cloud', 'g@ca'),
                        ('daco', 'h@ca'), ('daco', 'i@ca'), ('cloud', 'h@ca'), ('daco', 'j@ca'),
                        ('cloud', 'a@ca'), ('cloud', 'f@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')]),
-        ('add', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('cloud', 'b@ca'), ('daco', 'd@ca'),
-                 ('daco', 'e@ca'), ('cloud', 'e@ca')]),
-        ('create_user', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
+        ('add', [('daco', 'a@ca'), ('daco', 'aa@ca'), ('cloud', 'aa@ca'), ('cloud', 'b@ca')]),
+        # ('ego_user_not_found', [('d@ca', 'Person D'), ('e@ca', 'Person E')]),
+        ('ego_user_not_found', [('d@ca'), ('e@ca')]),
         ('get_users', ['daco', 'cloud']),
         ('remove', [('daco', 'i@ca'), ('cloud', 'i@ca'), ('daco', 'j@ca'), ('cloud', 'j@ca'), ('daco', 'c@ca'),
                     ('cloud', 'c@ca'), ('cloud', 'h@ca'), ('daco', 'k@ca'), ('cloud', 'k@ca')])
