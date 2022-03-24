@@ -18,3 +18,11 @@ That's it!
 
 ## Development
 Requires Python 3.6 due to the use of format strings. 
+
+To test with a local ego and dac-api (http), enable insecure transport. In daco2ego.py, below the other imports, add:
+
+```
+import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+```
+Make sure to remove in production!
