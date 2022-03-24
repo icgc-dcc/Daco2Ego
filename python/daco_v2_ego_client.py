@@ -48,4 +48,4 @@ class DacoV2EgoClient(object):
         
         if r.ok:
             return r.text
-        raise IOError(f"Error trying to GET {r.url}", r)
+        raise IOError(f"Error requesting approved users from {r.url}", r)

@@ -124,8 +124,8 @@ def init(config):
     ego_client = EgoClient(base_url, rest_client,  # Want to create a factory for new oauth clients
                            lambda: get_oauth_authenticated_client(base_url, client_id, client_secret))
 
+    # create second rest and ego client to access permissions for dac-api in argo ego
     daco_v2_rest_client = get_oauth_authenticated_client(daco_v2_ego_url, daco_v2_client_id, daco_v2_client_secret)
-    # create second ego client to access permissions for dac-api
     daco_v2_ego_client = DacoV2EgoClient(daco_v2_ego_url, daco_v2_rest_client, dac_api_url,  # Want to create a factory for new oauth clients
                             lambda: get_oauth_authenticated_client(daco_v2_ego_url, daco_v2_client_id, daco_v2_client_secret))
 
@@ -138,8 +138,10 @@ def init(config):
     daco1_users = get_users(daco, cloud)
     daco2_users = daco2_csv_to_dict(usersFromDacApi)
 
+    # initialize list with daco v2 users
     combined_users = list(daco2_users.values())
 
+    # add in users from v1 if they are not already present
     for user in daco1_users:
         key = user.email
         if (key not in daco2_users):
