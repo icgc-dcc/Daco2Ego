@@ -25,7 +25,7 @@ def read_config(name="config/default.conf"):
     return conf
 
 
-def csv_to_dict(data, encoding_override=None):
+def csv_to_dict(data, encoding_override=None, source=''):
     if encoding_override is None:
         text = data.decode()
     else:
@@ -34,7 +34,7 @@ def csv_to_dict(data, encoding_override=None):
     csv_reader = csv.DictReader(text.splitlines())
 
     ret_list = []
-    print('Converting DACO 1 users')
+    print(f'Converting DACO 1 users from {source} file')
 
     for u in csv_reader:
         print(f'DACO 1 user:', u)
@@ -134,8 +134,8 @@ def init(config):
 
     encoding_override = config.get('file_encoding_override', None)
 
-    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv, hexdump=hexdump), encoding_override)
-    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv, hexdump=hexdump), encoding_override)
+    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv, hexdump=hexdump), encoding_override, 'daco')
+    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv, hexdump=hexdump), encoding_override, 'cloud')
 
     usersFromDacApi = daco_v2_ego_client.download_daco2_approved_users()
     daco1_users = get_users(daco, cloud)
