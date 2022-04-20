@@ -25,7 +25,7 @@ def read_config(name="config/default.conf"):
     return conf
 
 
-def csv_to_dict(data, encoding_override=None):
+def csv_to_dict(data, encoding_override=None, source=''):
     if encoding_override is None:
         text = data.decode()
     else:
@@ -34,8 +34,10 @@ def csv_to_dict(data, encoding_override=None):
     csv_reader = csv.DictReader(text.splitlines())
 
     ret_list = []
-    for u in csv_reader:
+    print(f'Converting DACO 1 users from {source} file')
 
+    for u in csv_reader:
+        print(f'DACO 1 user:', u)
         try:
             openid = u['openid'].lower()
         except:
@@ -53,8 +55,9 @@ def csv_to_dict(data, encoding_override=None):
 def daco2_csv_to_dict(data):
     ret_dict = {}
     reader = csv.DictReader(data.splitlines())
-
+    print('Converting DACO 2 users')
     for user in reader:
+        print(f'DACO 2 user:', user)
         openid = user['OPENID'].lower()
         user_name = user['USER NAME']
         ret_dict[openid] = User(openid,user_name,True,True)
@@ -131,8 +134,8 @@ def init(config):
 
     encoding_override = config.get('file_encoding_override', None)
 
-    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv, hexdump=hexdump), encoding_override)
-    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv, hexdump=hexdump), encoding_override)
+    daco = csv_to_dict(decrypt_file(config['daco_file'], key, iv, hexdump=hexdump), encoding_override, 'daco')
+    cloud = csv_to_dict(decrypt_file(config['cloud_file'], key, iv, hexdump=hexdump), encoding_override, 'cloud')
 
     usersFromDacApi = daco_v2_ego_client.download_daco2_approved_users()
     daco1_users = get_users(daco, cloud)
@@ -145,6 +148,7 @@ def init(config):
     for user in daco1_users:
         key = user.email
         if (key not in daco2_users):
+            print(f'V1 User not in V2, adding to combined list...', user)
             combined_users.append(user)
 
     daco_group = config['client']['daco_group']
