@@ -21,11 +21,7 @@ class DacoClient(object):
         self._counts = {}
 
     def update_ego(self):
-        """ Handle scenarios 1-4 wiki specification at
-            https://wiki.oicr.on.ca/display/DCCSOFT/DACO2EGO
-
-            Scenario 6 (error handling) is also handled implicitly by all
-            calls to our ego client, which traps and logs all exceptions.
+        """ Handles documented scenarios
 
             returns: A list of issues encountered
         """
