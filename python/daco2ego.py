@@ -35,33 +35,9 @@ def daco_users_csv_to_list(data):
 
     return ret_list
 
-def users_with_access_to(data):
-    return {u[0] for u in data}
-
 
 def is_member(members, candidate):
     return candidate in members
-
-
-def daco_users(daco, cloud_members):
-    return [User(email, name, True, email in cloud_members)
-            for email, name in daco]
-
-
-def invalid_users(cloud, daco_members):
-    return [User(email, name, False, True)
-            for email, name in cloud
-            if email not in daco_members]
-
-
-def get_users(daco, cloud):
-    cloud_members = users_with_access_to(cloud)
-    daco_members = users_with_access_to(daco)
-
-    d = daco_users(daco, cloud_members)
-    i = invalid_users(cloud, daco_members)
-
-    return d + i
 
 
 def send_report(issues, summary):

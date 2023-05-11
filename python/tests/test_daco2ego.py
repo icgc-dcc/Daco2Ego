@@ -1,35 +1,39 @@
 #!/usr/bin/env python
-from daco2ego import csv_to_dict, get_users, read_config
+from daco2ego import daco_users_csv_to_list, read_config
 from daco_user import User
 
 
 def test_read_config():
     expected = {
-        "client": {"base_url": "https://ego/v1/"},
-        "aes": {"key": "a1a2a3a4a5a6a7a8a9aa", "iv": "b1b2b3b4b5b6b7b8b9bb"},
-        "daco_file": "config/daco.csv",
-        "cloud_file": "config/cloud.csv"
+        "client": {
+            "base_url": "https://ego/v1/",
+            "daco_group": "DACO-TEST",
+            "cloud_group":"DACO-CLOUD-TEST"
+        },
+        "daco_v2_client": {
+            "ego_url": "https://ego/v2/",
+            "dac_api_url": "https://dac-api/v2/"
+        }
     }
     config = read_config("tests/test.conf")
     assert config == expected
 
 
 def file_to_dict(name):
-    with open("tests/" + name, "rb") as f:
-        return csv_to_dict(f.read())
+    with open("tests/" + name, "r") as f:
+        return daco_users_csv_to_list(f.read())
 
 
 def test_users():
     expected = [
-        User('wonderful@gmail.com', '&Aacute; wo&ntilde;derful user',
-             True, False),
-        User('a.random.guy.random@gmail.com', 'SOME RANDOM GUY',
-             True, True),
-        User('a.person@gmail.com', 'A Person', True, False),
-        User('cloud_only@gmail.com', 'Cloudy Future', False, True)]
+        User('dd@example.com','DDD LLL', True, True),
+        User('betty_gmail@example.com','Betty White',True, True),
+        User('blanche_d@example.com', 'Blanche Devereaux', True, True),
+        User('sofia_gmail6@example.com', 'NewFirst Tester',True, True),
+        User('edna_k@example.com', 'Edna Krabapple', True, True),
+        User('gary_chalmers@example.com', 'Gary Chalmers', True, True )
+    ]
 
-    daco = file_to_dict("daco.csv")
-    cloud = file_to_dict("cloud.csv")
-    users = get_users(daco, cloud)
-    print(users)
-    assert users == expected
+    daco = file_to_dict("test_users.csv")
+    print(daco)
+    assert daco == expected
