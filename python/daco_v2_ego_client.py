@@ -1,4 +1,3 @@
-import json
 import logging
 from oauthlib.oauth2 import TokenExpiredError
 
@@ -43,7 +42,7 @@ class DacoV2EgoClient(object):
         raise IOError(f"Error trying to GET {r.url}", r)
 
     @retry_oauth
-    def download_daco2_approved_users(self):
+    def download_approved_users(self):
         r = self._rest_client.get(self.dac_api_url + "/export/approved-users/?format=daco-file-format")
         
         if r.ok:
